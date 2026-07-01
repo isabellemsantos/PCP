@@ -1,0 +1,25 @@
+PCP - atualização Office 2021 / Excel sem reparos
+
+Esta versão corrige o problema de abertura do dados_pcp.xlsx no Excel 2021.
+
+O que mudou:
+- Removidas Tabelas Estruturadas e AutoFiltro automático do Excel gerado.
+- O arquivo passa a usar intervalos formatados e gráficos nativos compatíveis com Office 2021.
+- Dashboard do Excel ampliado com cartões e gráficos adicionais.
+- Inclusas abas KPI por Grupo e KPI por Rota.
+- Aba Base Power BI mantida para conexão no Power BI.
+
+Como atualizar:
+1. Pare o servidor PCP.
+2. Faça backup de C:\Sites\PCP\pcp.sqlite3.
+3. Extraia este ZIP por cima de C:\Sites\PCP.
+4. Escolha substituir os arquivos no destino.
+5. Não apague o pcp.sqlite3.
+6. Rode iniciar_pcp.bat novamente.
+7. No navegador, pressione Ctrl + F5.
+
+Depois de abrir o sistema, clique em Exportar Excel ou aguarde o sistema gerar o dados_pcp.xlsx novamente.
+Se existir um dados_pcp.xlsx antigo com erro, feche o Excel e deixe o sistema recriar o arquivo.
+
+
+Atualização: visual escuro original restaurado, mantendo as funcionalidades mais recentes.

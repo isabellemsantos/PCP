@@ -1,0 +1,603 @@
+[2026-06-30 12:09:42] Backup automático gerado em C:\Sites\PCP\backups
+[2026-06-30 12:15:40] Backup automático gerado em C:\Sites\PCP\backups
+[2026-06-30 15:46:59] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1844, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 835, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 99, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 55, in get_auth_info
+    login = (request.headers.get("X-PCP-Login", "") or "").strip().upper()
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 15:47:00] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1844, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 835, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 99, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 55, in get_auth_info
+    login = (request.headers.get("X-PCP-Login", "") or "").strip().upper()
+             ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 15:50:54] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1872, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 863, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 127, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 83, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 15:50:55] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1872, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 863, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 127, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 83, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 15:53:09] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1872, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 863, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 127, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 83, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 15:56:52] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1872, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 863, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 127, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 83, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:02:48] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1860, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 851, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 116, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 72, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:06:29] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:06:30] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:06:33] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:06:34] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:06:34] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:06:35] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:06:35] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:06:35] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-06-30 16:06:36] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-07-01 06:37:08] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-07-01 06:37:08] Backup automático gerado em C:\Sites\PCP\backups
+[2026-07-01 09:14:01] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1859, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-07-01 17:28:24] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1902, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-07-01 17:32:46] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1902, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-07-01 17:32:47] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1902, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-07-01 17:43:32] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1902, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-07-01 17:43:34] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1902, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-07-01 17:52:42] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1902, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
+[2026-07-01 17:52:43] Não consegui recarregar CPDs do Excel na inicialização:
+Traceback (most recent call last):
+  File "C:\Sites\PCP\servidor_pcp.py", line 1902, in <module>
+    import_cpds_from_excel_file(EXCEL_FILE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 850, in import_cpds_from_excel_file
+    audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+                                                                                   ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 115, in current_actor
+    return (actor or get_auth_info().get("login") or default)[:80]
+                     ~~~~~~~~~~~~~^^
+  File "C:\Sites\PCP\servidor_pcp.py", line 74, in get_auth_info
+    login = normalize_login(request.headers.get("X-PCP-Login", "") or "")
+                            ^^^^^^^^^^^^^^^
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 318, in __get__
+    obj = instance._get_current_object()
+  File "C:\Users\Tecnica\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\werkzeug\local.py", line 519, in _get_current_object
+    raise RuntimeError(unbound_message) from None
+RuntimeError: Working outside of request context.
+
+This typically means that you attempted to use functionality that needed
+an active HTTP request. Consult the documentation on testing for
+information about how to avoid this problem.
+
