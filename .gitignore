@@ -8,3 +8,9 @@ backups/
 
 # Logs do servidor
 *.log
+
+# Planilha de dados reais (não deve ser versionada)
+dados_pcp.xlsx
+
+# Backups históricos em zip
+HISTÓRICO/*.zip
