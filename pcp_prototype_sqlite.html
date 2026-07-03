@@ -320,6 +320,28 @@
   .obs-edit-btn{background:#44546a!important;color:#fff!important;border-color:#334155!important;}
   .obs-edit-btn:hover{background:#334155!important;}
 
+
+  /* Ajustes restaurados: números coloridos e seleção de semanas mais visível */
+  .sum-val{color:inherit !important;}
+  #c-total{color:var(--blue) !important;}
+  #c-pend{color:var(--amber) !important;}
+  #c-atrasado{color:var(--red) !important;}
+  #c-done{color:var(--green) !important;}
+  .sections-bar{background:rgba(255,255,255,.04) !important;border:1px solid rgba(255,255,255,.10) !important;border-radius:16px !important;padding:10px !important;gap:8px !important;}
+  .sec-pill-wrap{background:#34322f !important;border:1px solid rgba(255,255,255,.10) !important;box-shadow:none !important;border-radius:14px !important;padding:4px !important;}
+  .sec-pill-wrap .sec-pill,.sec-pill{background:#3a3835 !important;color:#d8d6d1 !important;border:1px solid rgba(255,255,255,.14) !important;font-size:13px !important;font-weight:800 !important;padding:8px 14px !important;border-radius:12px !important;}
+  .sec-pill.on{background:linear-gradient(135deg,#2537d8,#3b82f6) !important;border-color:#3b82f6 !important;color:#fff !important;box-shadow:0 0 0 1px rgba(255,255,255,.10),0 10px 22px rgba(37,55,216,.35) !important;}
+  .sec-pill .dot{width:7px !important;height:7px !important;background:#22c55e !important;box-shadow:0 0 8px rgba(34,197,94,.45) !important;}
+  .group-divider{background:rgba(255,255,255,.03) !important;border:1px solid rgba(255,255,255,.08) !important;border-radius:14px !important;padding:10px 12px !important;}
+  .group-divider .label{font-size:16px !important;font-weight:800 !important;color:#f0ede8 !important;}
+  .group-divider .count{color:#bdb8b0 !important;font-size:13px !important;}
+  .group-divider .line{background:rgba(255,255,255,.14) !important;}
+
+
+  .view-only-action{display:none;}
+  .view-only .view-only-action{display:inline-flex !important;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,var(--brand-blue),#1d4ed8) !important;color:#fff !important;border-color:rgba(255,255,255,.22) !important;font-weight:800 !important;box-shadow:0 8px 18px rgba(46,63,255,.26) !important;}
+  .view-only .view-only-action:hover{filter:brightness(1.08);}
+
 </style>
 
 <style id="pcp-theme-cinza-grafite">
@@ -451,6 +473,28 @@
   .notes-hero{background:linear-gradient(135deg,rgba(46,63,255,.13),rgba(249,2,2,.08)) !important;border-color:var(--border-strong) !important;box-shadow:none !important;}
   .empty{color:#76746F !important;}
 
+
+  /* Ajustes restaurados: números coloridos e seleção de semanas mais visível */
+  .sum-val{color:inherit !important;}
+  #c-total{color:var(--blue) !important;}
+  #c-pend{color:var(--amber) !important;}
+  #c-atrasado{color:var(--red) !important;}
+  #c-done{color:var(--green) !important;}
+  .sections-bar{background:rgba(255,255,255,.04) !important;border:1px solid rgba(255,255,255,.10) !important;border-radius:16px !important;padding:10px !important;gap:8px !important;}
+  .sec-pill-wrap{background:#34322f !important;border:1px solid rgba(255,255,255,.10) !important;box-shadow:none !important;border-radius:14px !important;padding:4px !important;}
+  .sec-pill-wrap .sec-pill,.sec-pill{background:#3a3835 !important;color:#d8d6d1 !important;border:1px solid rgba(255,255,255,.14) !important;font-size:13px !important;font-weight:800 !important;padding:8px 14px !important;border-radius:12px !important;}
+  .sec-pill.on{background:linear-gradient(135deg,#2537d8,#3b82f6) !important;border-color:#3b82f6 !important;color:#fff !important;box-shadow:0 0 0 1px rgba(255,255,255,.10),0 10px 22px rgba(37,55,216,.35) !important;}
+  .sec-pill .dot{width:7px !important;height:7px !important;background:#22c55e !important;box-shadow:0 0 8px rgba(34,197,94,.45) !important;}
+  .group-divider{background:rgba(255,255,255,.03) !important;border:1px solid rgba(255,255,255,.08) !important;border-radius:14px !important;padding:10px 12px !important;}
+  .group-divider .label{font-size:16px !important;font-weight:800 !important;color:#f0ede8 !important;}
+  .group-divider .count{color:#bdb8b0 !important;font-size:13px !important;}
+  .group-divider .line{background:rgba(255,255,255,.14) !important;}
+
+
+  .view-only-action{display:none;}
+  .view-only .view-only-action{display:inline-flex !important;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,var(--brand-blue),#1d4ed8) !important;color:#fff !important;border-color:rgba(255,255,255,.22) !important;font-weight:800 !important;box-shadow:0 8px 18px rgba(46,63,255,.26) !important;}
+  .view-only .view-only-action:hover{filter:brightness(1.08);}
+
 </style>
 
 </head>
@@ -476,6 +520,7 @@
     <button onclick="trocarUsuario()" id="usuario-btn" class="edit-only" title="Clique para trocar o usuário registrado">Usuário: —</button>
     <span id="conn-status" class="conn-status conn-loading">● Conectando...</span>
     <button onclick="carregarServidor(true)">↻ Atualizar</button>
+    <button class="view-only-action" onclick="enviarSolicitacaoPCP()">Enviar solicitação ao PCP</button>
     <button class="edit-only" onclick="exportarExcel()">Exportar Excel</button>
     <button class="edit-only" onclick="gerarBackupAgora()">Backup agora</button>
     <label class="btn-like edit-only" for="excel-import-input">Importar Excel</label>
@@ -488,7 +533,7 @@
 <div class="main">
 
   <div class="summary">
-    <div class="sum-card"><div class="sum-val" id="c-total">0</div><div class="sum-lbl">Total ativos</div></div>
+    <div class="sum-card"><div class="sum-val" id="c-total" style="color:var(--blue)">0</div><div class="sum-lbl">Total ativos</div></div>
     <div class="sum-card"><div class="sum-val" id="c-pend" style="color:var(--amber)">0</div><div class="sum-lbl">Pendentes</div></div>
     <div class="sum-card"><div class="sum-val" id="c-atrasado" style="color:var(--red)">0</div><div class="sum-lbl">Esta semana/Vencido</div></div>
     <div class="sum-card"><div class="sum-val" id="c-done" style="color:var(--green)">0</div><div class="sum-lbl">Concluídos (total)</div></div>
@@ -953,6 +998,48 @@ function carregarAuthSalvo(){
   return false;
 }
 
+
+function enviarSolicitacaoPCP(){
+  const emailDestino = 'followup@mtrtopura.com.br';
+  const loginAcesso = authInfo && authInfo.login ? authInfo.login : 'VENDAS/EXPEDICAO';
+  let nome = '';
+  try{ nome = window.localStorage ? (window.localStorage.getItem('pcp_solicitante_nome_v1') || '') : ''; }catch(e){}
+  nome = String(nome || '').trim();
+  const digitado = prompt('Informe seu nome para identificar quem está solicitando:', nome);
+  if(digitado === null) return;
+  nome = String(digitado || '').trim();
+  if(!nome){
+    alert('Informe o nome de quem está solicitando para facilitar o retorno do PCP.');
+    return;
+  }
+  try{ window.localStorage.setItem('pcp_solicitante_nome_v1', nome); }catch(e){}
+
+  const assunto = 'Solicitação PCP - ' + nome + ' - ' + loginAcesso;
+  const corpo = [
+    'Olá, PCP.',
+    '',
+    'Solicitante: ' + nome,
+    'Área/usuário de acesso: ' + loginAcesso,
+    '',
+    'Solicito apoio referente ao pedido abaixo:',
+    '',
+    'Cliente:',
+    'CPD:',
+    'Descrição do item:',
+    'Quantidade:',
+    'Data de entrega:',
+    '',
+    'Descrição detalhada da solicitação:',
+    '',
+    '',
+    'Se possível, anexar ou colar um print do pedido para facilitar a identificação.',
+    '',
+    'Obrigado.'
+  ].join('\n');
+  const link = 'mailto:' + encodeURIComponent(emailDestino) + '?subject=' + encodeURIComponent(assunto) + '&body=' + encodeURIComponent(corpo);
+  window.location.href = link;
+}
+
 function exigirEdicao(){
   if(isEditor()) return true;
   alert('Este usuário tem acesso somente para visualização. Entre como PCP para editar.');
@@ -1336,6 +1423,8 @@ async function novaSecao(){
   const novaSec = {id, name:fmtDate(defaultDate), defaultDate, active:true, criadoPor:getCurrentUser(), criadoEm:nowLocalStr(), alteradoPor:getCurrentUser(), alteradoEm:nowLocalStr()};
   sections.forEach(s=>s.active=false);
   sections.push(novaSec);
+  currentTab = 'ativa';
+  sectionFilter = id;
   render();
   await apiJSON('/api/sections/'+encodeURIComponent(id), 'PUT', novaSec);
 }
@@ -1642,7 +1731,7 @@ function render(){
     const activeCount = orders.filter(o=>o.secaoId===s.id && !isFinalizado(o)).length;
     const doneCount = orders.filter(o=>o.secaoId===s.id && isFinalizado(o)).length;
     const visibleCount = currentTab === 'ativa' ? activeCount : doneCount;
-    if(visibleCount === 0) return '';
+    if(visibleCount === 0 && !(currentTab==='ativa' && (s.active || sectionFilter===s.id))) return '';
     const label = sectionLabel(s) + ' (' + visibleCount + ')';
     return `<span class="sec-pill-wrap"><button class="sec-pill ${sectionFilter===s.id?'on':''}" onclick="setSectionFilter('${s.id}')">${s.active && currentTab==='ativa'?'<span class="dot"></span>':''}${label}</button></span>`;
   }).join('') + `<button class="sec-pill ${sectionFilter==='todas'?'on':''}" onclick="setSectionFilter('todas')">Todas</button>` + `${isEditor()?`<button class="small" onclick="novaSecao()">+ Nova data</button>`:''}`;
