@@ -522,6 +522,7 @@
     <button onclick="carregarServidor(true)">↻ Atualizar</button>
     <button class="view-only-action" onclick="enviarSolicitacaoPCP()">Enviar solicitação ao PCP</button>
     <button class="edit-only" onclick="exportarExcel()">Exportar Excel</button>
+    <button class="edit-only" onclick="exportarPendentes()">Exportar Pendentes</button>
     <button class="edit-only" onclick="gerarBackupAgora()">Backup agora</button>
     <label class="btn-like edit-only" for="excel-import-input">Importar Excel</label>
     <input id="excel-import-input" type="file" accept=".xlsx" style="display:none" onchange="importarExcel(this)">
@@ -1155,6 +1156,9 @@ function initBackend(){
 
 function exportarExcel(){
   window.location.href = '/api/export.xlsx';
+}
+function exportarPendentes(){
+  window.location.href = '/api/export_pendentes.xlsx';
 }
 async function gerarBackupAgora(){
   if(!exigirEdicao()) return;

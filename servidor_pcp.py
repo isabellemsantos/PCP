@@ -1850,6 +1850,98 @@ def api_export_xlsx():
     return send_file(tmp, as_attachment=True, download_name="dados_pcp.xlsx")
 
 
+def export_pendentes_to_xlsx(state: dict, path: Path) -> None:
+    """Exporta os pedidos ainda não finalizados, na formatação da planilha follow (cabeçalho azul claro, agrupado por data)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Pedidos Pendentes"
+
+    header_fill = PatternFill("solid", fgColor="C6D9F1")
+    header_font = Font(name="Arial", size=11, bold=True)
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    medium = Side(style="medium")
+    header_border = Border(left=medium, right=medium, top=medium, bottom=medium)
+    thin = Side(style="thin", color="D0D0D0")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    date_font = Font(bold=True)
+
+    orders = state.get("orders", [])
+    sections = state.get("sections", [])
+    sec_map = {s.get("id"): s for s in sections}
+
+    pendentes = [o for o in orders if not is_finalizado(o)]
+
+    def sort_key(o):
+        sec = sec_map.get(o.get("secaoId"), {})
+        d = parse_date_value(sec.get("defaultDate"))
+        d_ord = d if isinstance(d, date) else date.max
+        try:
+            numero = int(o.get("numero") or 0)
+        except (TypeError, ValueError):
+            numero = 0
+        return (d_ord, numero)
+
+    pendentes.sort(key=sort_key)
+
+    headers = [
+        "ITEM", "DATA DE ENTREGA", "CPD", "STATUS",
+        "QUANTIDADE FALTANTE", "PREVISÃO DE RETORNO", "CLIENTE", "PRAZO", "OBS.",
+    ]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_align
+        cell.border = header_border
+
+    widths = [8, 14, 10, 16, 14, 15, 18, 12, 32]
+    for col, w in zip("ABCDEFGHI", widths):
+        ws.column_dimensions[col].width = w
+    ws.freeze_panes = "A2"
+
+    row_idx = 2
+    last_sec = object()
+    for o in pendentes:
+        sec_key = o.get("secaoId")
+        if sec_key != last_sec:
+            sec = sec_map.get(sec_key)
+            label = section_label(sec) if sec else "Sem data"
+            banner = ws.cell(row=row_idx, column=1, value=label)
+            banner.font = date_font
+            ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=len(headers))
+            row_idx += 1
+            last_sec = sec_key
+        values = [
+            o.get("numero", ""),
+            parse_date_value(o.get("dataEntregaAtual", "")),
+            o.get("cpd", ""),
+            status_label(o),
+            o.get("qtd", ""),
+            parse_date_value(o.get("previsao", "")),
+            o.get("cliente", ""),
+            prazo_label(o),
+            o.get("obs", ""),
+        ]
+        for col_idx, val in enumerate(values, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.border = border
+            if col_idx in (2, 6) and isinstance(val, date):
+                cell.number_format = "DD-MM-YYYY"
+        row_idx += 1
+
+    wb.save(path)
+
+
+@app.get("/api/export_pendentes.xlsx")
+def api_export_pendentes_xlsx():
+    if Workbook is None:
+        return jsonify({"error": "openpyxl não está instalado"}), 500
+    state = load_state()
+    tmp = Path(tempfile.gettempdir()) / f"pedidos_pendentes_{uuid.uuid4().hex}.xlsx"
+    export_pendentes_to_xlsx(state, tmp)
+    return send_file(tmp, as_attachment=True, download_name="pedidos_pendentes.xlsx")
+
+
 @app.get("/")
 @app.get("/pcp_prototype.html")
 @app.get("/pcp_prototype_sqlite.html")
