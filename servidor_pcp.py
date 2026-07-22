@@ -15,7 +15,7 @@ import hashlib
 import hmac
 import unicodedata
 
-from flask import Flask, Response, jsonify, request, send_file, send_from_directory
+from flask import Flask, Response, has_request_context, jsonify, request, send_file
 
 try:
     from openpyxl import Workbook, load_workbook
@@ -28,14 +28,28 @@ except ImportError:  # pragma: no cover
     Workbook = None
     load_workbook = None
 
+import db_manutencao
+
+
+def _env_path(var: str, default: Path) -> Path:
+    """Permite sobrepor caminhos de arquivo via variável de ambiente.
+
+    Usado pelos testes automatizados para apontar para uma cópia isolada do
+    banco/Excel/log/backups sem jamais tocar nos arquivos reais. Sem a
+    variável de ambiente, o comportamento é idêntico ao de antes.
+    """
+    value = os.environ.get(var)
+    return Path(value) if value else default
+
+
 ROOT = Path(__file__).resolve().parent
 HTML_FILE = ROOT / "pcp_prototype.html"
-DB_FILE = ROOT / "pcp.sqlite3"
-EXCEL_FILE = ROOT / "dados_pcp.xlsx"
-EXCEL_PENDING_FILE = ROOT / "dados_pcp_pendente.xlsx"
+DB_FILE = _env_path("PCP_DB_FILE", ROOT / "pcp.sqlite3")
+EXCEL_FILE = _env_path("PCP_EXCEL_FILE", ROOT / "dados_pcp.xlsx")
+EXCEL_PENDING_FILE = _env_path("PCP_EXCEL_PENDING_FILE", ROOT / "dados_pcp_pendente.xlsx")
 BASE_CPD_FILE = ROOT / "base_cpds.json"
-LOG_FILE = ROOT / "servidor_pcp.log"
-BACKUP_DIR = ROOT / "backups"
+LOG_FILE = _env_path("PCP_LOG_FILE", ROOT / "servidor_pcp.log")
+BACKUP_DIR = _env_path("PCP_BACKUP_DIR", ROOT / "backups")
 PORT = int(os.environ.get("PCP_PORT", "8080"))
 
 app = Flask(__name__)
@@ -103,7 +117,14 @@ def hoje_iso() -> str:
 
 
 def current_actor(default: str = "Não informado") -> str:
-    """Nome da pessoa usando a tela. Vem do campo 'Usuário' no navegador."""
+    """Nome da pessoa usando a tela. Vem do campo 'Usuário' no navegador.
+
+    Fora de uma requisição HTTP (ex.: rotinas de inicialização do servidor)
+    não existe `request` para consultar, então retorna `default` direto sem
+    tocar em `request`/`get_auth_info()`.
+    """
+    if not has_request_context():
+        return default
     actor = ""
     try:
         actor = (request.headers.get("X-PCP-User", "") or "").strip()
@@ -291,7 +312,23 @@ def init_db() -> None:
         c.execute("INSERT OR IGNORE INTO meta(key,value) VALUES('updated_at','')")
         c.execute("INSERT OR IGNORE INTO meta(key,value) VALUES('next_order_number','1')")
         seed_base_cpds(c)
+        # Cria a chave schema_version (começando em 1) se ainda não existir.
+        # Nesta etapa não há migrações registradas: só prepara a estrutura.
+        db_manutencao.get_schema_version(c)
         c.commit()
+
+
+def run_pending_migrations() -> dict:
+    """Aplica migrações de schema pendentes, sempre com backup validado antes.
+
+    Hoje db_manutencao.MIGRATIONS está vazio, então isto é um no-op seguro;
+    a função existe para que migrações futuras já tenham por onde rodar.
+    """
+    with lock, conn() as c:
+        resultado = db_manutencao.run_migrations(c, DB_FILE, BACKUP_DIR, log=log)
+        if resultado.get("migracoes_aplicadas"):
+            log(f"[migracao] Versão final do schema: {resultado['versao_final']}")
+        return resultado
 
 
 def get_meta(c: sqlite3.Connection) -> dict:
@@ -424,7 +461,14 @@ def ensure_first_section(c: sqlite3.Connection) -> str:
 
 
 def run_daily_backup(force: bool = False) -> None:
-    """Cria backup diário do banco e do Excel sem depender do usuário."""
+    """Cria backup diário do banco (via API oficial do SQLite) e do Excel.
+
+    O banco usa sqlite3.Connection.backup() através de db_manutencao, que
+    funciona corretamente com o banco em modo WAL e só considera o backup
+    válido se ele abrir e o PRAGMA integrity_check retornar "ok". O Excel
+    continua copiado com shutil.copy2 (não é um banco SQLite, não usa WAL).
+    Nenhum backup existente é apagado.
+    """
     try:
         BACKUP_DIR.mkdir(exist_ok=True)
         today = datetime.now().strftime("%Y-%m-%d")
@@ -435,13 +479,15 @@ def run_daily_backup(force: bool = False) -> None:
             last = c.execute("SELECT value FROM meta WHERE key=?", (marker_key,)).fetchone()
             if (not force) and last and last["value"] == today:
                 return
-            if DB_FILE.exists():
-                shutil.copy2(DB_FILE, BACKUP_DIR / f"pcp_backup_{stamp}.sqlite3")
-            if EXCEL_FILE.exists():
-                shutil.copy2(EXCEL_FILE, BACKUP_DIR / f"dados_pcp_backup_{stamp}.xlsx")
             c.execute("INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)", (marker_key, today))
             c.commit()
-            log(f"Backup automático gerado em {BACKUP_DIR}")
+
+        backup_path = db_manutencao.criar_backup_sqlite(DB_FILE, BACKUP_DIR, prefixo="pcp_backup", log=log)
+        if backup_path is None:
+            log("Backup automático do SQLite FALHOU (integrity_check inválido ou erro). Veja o log acima.")
+        if EXCEL_FILE.exists():
+            shutil.copy2(EXCEL_FILE, BACKUP_DIR / f"dados_pcp_backup_{stamp}.xlsx")
+        log(f"Backup automático gerado em {BACKUP_DIR}")
     except Exception:
         log("Erro ao gerar backup automático:\n" + traceback.format_exc())
 
@@ -839,7 +885,15 @@ def import_cpd_sheets_into_conn(wb, c: sqlite3.Connection) -> int:
     return count
 
 
-def import_cpds_from_excel_file(path: Path) -> dict:
+def import_cpds_from_excel_file(path: Path, actor: str | None = None) -> dict:
+    """Recarrega a aba Base CPDs do Excel.
+
+    `actor` deve ser informado explicitamente quando chamado fora de uma
+    requisição HTTP (ex.: na inicialização do servidor, use
+    actor="Sistema/Inicialização"), já que nesse caso não há `request` para
+    `current_actor()` consultar. Quando chamado a partir de uma rota da
+    tela, deixe `actor=None` para usar o usuário autenticado normalmente.
+    """
     if load_workbook is None:
         raise RuntimeError("openpyxl não está instalado")
     if not path.exists():
@@ -847,7 +901,7 @@ def import_cpds_from_excel_file(path: Path) -> dict:
     wb = load_workbook(path, data_only=True)
     with lock, conn() as c:
         imported = import_cpd_sheets_into_conn(wb, c)
-        audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, current_actor("Importação Excel"))
+        audit(c, "import", "cpd_xlsx", None, {"cpds": imported, "arquivo": path.name}, actor or current_actor("Importação Excel"))
         state = after_write_state(c)
     return {**state, "imported": {"cpds": imported}}
 
@@ -1951,11 +2005,6 @@ def pagina_principal():
     return Response(HTML_FILE.read_text(encoding="utf-8"), mimetype="text/html; charset=utf-8")
 
 
-@app.get("/<path:nome_arquivo>")
-def arquivos_estaticos(nome_arquivo: str):
-    return send_from_directory(ROOT, nome_arquivo)
-
-
 def ensure_existing_order_metadata() -> None:
     """Preenche campos de auditoria em pedidos antigos sem apagar dados existentes."""
     with lock, conn() as c:
@@ -1986,12 +2035,13 @@ def ensure_existing_order_metadata() -> None:
 
 if __name__ == "__main__":
     init_db()
+    run_pending_migrations()
     ensure_existing_order_numbers()
     ensure_existing_order_metadata()
     # Se existir um Excel já editado com a aba Base CPDs, recarrega essa base ao iniciar.
     if EXCEL_FILE.exists() and load_workbook is not None:
         try:
-            import_cpds_from_excel_file(EXCEL_FILE)
+            import_cpds_from_excel_file(EXCEL_FILE, actor="Sistema/Inicialização")
         except Exception:
             log("Não consegui recarregar CPDs do Excel na inicialização:\n" + traceback.format_exc())
     # Gera um Excel inicial caso ainda não exista.

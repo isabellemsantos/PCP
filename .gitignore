@@ -1,3 +1,7 @@
+# Python
+__pycache__/
+*.pyc
+
 # Banco de dados (dados reais, não deve ser versionado)
 *.sqlite3
 *.sqlite3-shm
@@ -11,6 +15,15 @@ backups/
 
 # Planilha de dados reais (não deve ser versionada)
 dados_pcp.xlsx
+dados_pcp_pendente.xlsx
+*.tmp.xlsx
+
+# Arquivos temporários do Office
+~$*
+
+# Segredos / ambiente local
+.env
+.venv/
 
 # Backups históricos em zip
 HISTÓRICO/*.zip
