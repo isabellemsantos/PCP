@@ -260,6 +260,7 @@ def ensure_existing_order_numbers() -> None:
 def conn() -> sqlite3.Connection:
     c = sqlite3.connect(DB_FILE)
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA foreign_keys=ON")
     c.execute("PRAGMA journal_mode=WAL")
     c.execute("PRAGMA synchronous=NORMAL")
     return c
@@ -321,14 +322,27 @@ def init_db() -> None:
 def run_pending_migrations() -> dict:
     """Aplica migrações de schema pendentes, sempre com backup validado antes.
 
-    Hoje db_manutencao.MIGRATIONS está vazio, então isto é um no-op seguro;
-    a função existe para que migrações futuras já tenham por onde rodar.
+    Chamar esta função só é seguro quando alguém decidiu deliberadamente
+    aplicar a(s) migração(ões) pendente(s); ver deve_aplicar_migracoes_automaticamente().
     """
     with lock, conn() as c:
         resultado = db_manutencao.run_migrations(c, DB_FILE, BACKUP_DIR, log=log)
         if resultado.get("migracoes_aplicadas"):
             log(f"[migracao] Versão final do schema: {resultado['versao_final']}")
         return resultado
+
+
+def deve_aplicar_migracoes_automaticamente() -> bool:
+    """Só roda migrações de schema sozinho se PCP_APLICAR_MIGRACOES=1.
+
+    Por padrão (variável ausente ou com qualquer outro valor) iniciar o
+    servidor NÃO aplica migrações pendentes: alguém precisa decidir e setar
+    essa variável explicitamente antes de reiniciar o servidor. Isso evita
+    que registrar uma nova migração em db_manutencao.MIGRATIONS altere o
+    schema do banco de produção na próxima vez que o servidor for iniciado,
+    sem revisão humana explícita naquele momento.
+    """
+    return os.environ.get("PCP_APLICAR_MIGRACOES") == "1"
 
 
 def get_meta(c: sqlite3.Connection) -> dict:
@@ -2033,9 +2047,33 @@ def ensure_existing_order_metadata() -> None:
         c.commit()
 
 
+def verificar_e_avisar_migracao_pendente() -> dict:
+    """Detecta migração de schema pendente e só registra aviso no log.
+
+    Nunca altera o banco. Usada no início do servidor quando
+    deve_aplicar_migracoes_automaticamente() é False, para que quem opera o
+    sistema saiba que há uma migração esperando uma decisão explícita
+    (PCP_APLICAR_MIGRACOES=1), em vez de simplesmente não dizer nada.
+    """
+    with lock, conn() as c:
+        versao_atual = db_manutencao.get_schema_version(c)
+    pendente = versao_atual in db_manutencao.MIGRATIONS
+    if pendente:
+        log(
+            f"[migracao] Há migração pendente (schema_version={versao_atual} de "
+            f"{db_manutencao.LATEST_SCHEMA_VERSION}), mas PCP_APLICAR_MIGRACOES não "
+            "está definida como '1'; nada foi alterado. Defina PCP_APLICAR_MIGRACOES=1 "
+            "e reinicie para aplicar deliberadamente."
+        )
+    return {"pendente": pendente, "versao_atual": versao_atual}
+
+
 if __name__ == "__main__":
     init_db()
-    run_pending_migrations()
+    if deve_aplicar_migracoes_automaticamente():
+        run_pending_migrations()
+    else:
+        verificar_e_avisar_migracao_pendente()
     ensure_existing_order_numbers()
     ensure_existing_order_metadata()
     # Se existir um Excel já editado com a aba Base CPDs, recarrega essa base ao iniciar.
