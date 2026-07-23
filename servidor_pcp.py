@@ -2068,6 +2068,39 @@ def verificar_e_avisar_migracao_pendente() -> dict:
     return {"pendente": pendente, "versao_atual": versao_atual}
 
 
+def deve_importar_cpds_na_inicializacao() -> bool:
+    """Só reimporta CPDs do Excel automaticamente ao iniciar se
+    PCP_IMPORTAR_CPDS_INICIALIZACAO=1.
+
+    Por padrão (variável ausente ou com qualquer outro valor, incluindo
+    "0") o servidor NÃO abre o Excel nem chama import_cpds_from_excel_file()
+    sozinho — evita criar uma auditoria de import a cada reinício mesmo
+    quando nenhum CPD mudou. Importação controlada continua disponível via
+    scripts/importar_cpds_excel.py.
+    """
+    return os.environ.get("PCP_IMPORTAR_CPDS_INICIALIZACAO") == "1"
+
+
+def executar_importacao_cpds_na_inicializacao() -> dict:
+    """Chamada pelo __main__ na inicialização: só abre o Excel e chama
+    import_cpds_from_excel_file() se deve_importar_cpds_na_inicializacao()
+    for True. Caso contrário, só registra no log que está desativada — não
+    toca no Excel, não importa nada, não cria auditoria. Para importar de
+    forma controlada, use scripts/importar_cpds_excel.py.
+    """
+    if not deve_importar_cpds_na_inicializacao():
+        log("Importação automática de CPDs desativada.")
+        return {"importou": False}
+    if EXCEL_FILE.exists() and load_workbook is not None:
+        try:
+            resultado = import_cpds_from_excel_file(EXCEL_FILE, actor="Sistema/Inicialização")
+            return {"importou": True, "cpds": resultado["imported"]["cpds"]}
+        except Exception:
+            log("Não consegui recarregar CPDs do Excel na inicialização:\n" + traceback.format_exc())
+            return {"importou": False, "erro": True}
+    return {"importou": False, "motivo": "excel_ausente_ou_openpyxl_indisponivel"}
+
+
 if __name__ == "__main__":
     init_db()
     if deve_aplicar_migracoes_automaticamente():
@@ -2076,12 +2109,7 @@ if __name__ == "__main__":
         verificar_e_avisar_migracao_pendente()
     ensure_existing_order_numbers()
     ensure_existing_order_metadata()
-    # Se existir um Excel já editado com a aba Base CPDs, recarrega essa base ao iniciar.
-    if EXCEL_FILE.exists() and load_workbook is not None:
-        try:
-            import_cpds_from_excel_file(EXCEL_FILE, actor="Sistema/Inicialização")
-        except Exception:
-            log("Não consegui recarregar CPDs do Excel na inicialização:\n" + traceback.format_exc())
+    executar_importacao_cpds_na_inicializacao()
     # Gera um Excel inicial caso ainda não exista.
     if not EXCEL_FILE.exists():
         save_excel_snapshot_safely()
