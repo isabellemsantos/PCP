@@ -117,10 +117,16 @@ class SegurancaMigracoesPCPTest(unittest.TestCase):
     # 2) Versão de schema
     # ------------------------------------------------------------------
 
-    def test_schema_version_comeca_em_1(self):
+    def test_schema_version_e_um_inteiro_valido(self):
+        # Não fixamos um valor esperado aqui: a cópia parte do pcp.sqlite3
+        # real, e a versão de schema desse banco reflete as migrações já
+        # aplicadas em produção (hoje, schema_version=2 após a migração
+        # v1->v2). O que importa é que get_schema_version nunca quebra e
+        # sempre devolve um inteiro >= 1.
         with self.servidor.conn() as c:
             versao = self.dbm.get_schema_version(c)
-        self.assertEqual(versao, 1)
+        self.assertIsInstance(versao, int)
+        self.assertGreaterEqual(versao, 1)
 
     def test_set_e_get_schema_version(self):
         with self.servidor.conn() as c:
@@ -135,11 +141,18 @@ class SegurancaMigracoesPCPTest(unittest.TestCase):
     # 3) Migração é idempotente e não altera nada sem migrações registradas
     # ------------------------------------------------------------------
 
-    def test_run_migrations_sem_migracoes_e_no_op(self):
+    def test_run_migrations_chamada_repetida_e_idempotente(self):
+        # A cópia parte do pcp.sqlite3 real (hoje em schema_version=2). Como
+        # migrar_v2_para_v3 está registrada, a primeira chamada tem uma
+        # migração pendente pra aplicar; a segunda, com o schema já na
+        # versão mais recente, deve ser sempre um no-op — não importa quantas
+        # migrações estejam registradas nesse momento.
         with self.servidor.conn() as c:
-            resultado = self.dbm.run_migrations(c, self.db_copia, self.tmp_dir / "backups_migracao")
-        self.assertEqual(resultado["versao_final"], 1)
-        self.assertEqual(resultado["migracoes_aplicadas"], [])
+            primeiro = self.dbm.run_migrations(c, self.db_copia, self.tmp_dir / "backups_migracao1")
+            segundo = self.dbm.run_migrations(c, self.db_copia, self.tmp_dir / "backups_migracao2")
+        self.assertEqual(primeiro["versao_final"], self.dbm.LATEST_SCHEMA_VERSION)
+        self.assertEqual(segundo["versao_final"], self.dbm.LATEST_SCHEMA_VERSION)
+        self.assertEqual(segundo["migracoes_aplicadas"], [])
 
     # ------------------------------------------------------------------
     # 4) Validação dos dados: totais antes/depois da (não-)migração batem

@@ -260,6 +260,7 @@ def ensure_existing_order_numbers() -> None:
 def conn() -> sqlite3.Connection:
     c = sqlite3.connect(DB_FILE)
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA foreign_keys=ON")
     c.execute("PRAGMA journal_mode=WAL")
     c.execute("PRAGMA synchronous=NORMAL")
     return c
@@ -321,14 +322,27 @@ def init_db() -> None:
 def run_pending_migrations() -> dict:
     """Aplica migrações de schema pendentes, sempre com backup validado antes.
 
-    Hoje db_manutencao.MIGRATIONS está vazio, então isto é um no-op seguro;
-    a função existe para que migrações futuras já tenham por onde rodar.
+    Chamar esta função só é seguro quando alguém decidiu deliberadamente
+    aplicar a(s) migração(ões) pendente(s); ver deve_aplicar_migracoes_automaticamente().
     """
     with lock, conn() as c:
         resultado = db_manutencao.run_migrations(c, DB_FILE, BACKUP_DIR, log=log)
         if resultado.get("migracoes_aplicadas"):
             log(f"[migracao] Versão final do schema: {resultado['versao_final']}")
         return resultado
+
+
+def deve_aplicar_migracoes_automaticamente() -> bool:
+    """Só roda migrações de schema sozinho se PCP_APLICAR_MIGRACOES=1.
+
+    Por padrão (variável ausente ou com qualquer outro valor) iniciar o
+    servidor NÃO aplica migrações pendentes: alguém precisa decidir e setar
+    essa variável explicitamente antes de reiniciar o servidor. Isso evita
+    que registrar uma nova migração em db_manutencao.MIGRATIONS altere o
+    schema do banco de produção na próxima vez que o servidor for iniciado,
+    sem revisão humana explícita naquele momento.
+    """
+    return os.environ.get("PCP_APLICAR_MIGRACOES") == "1"
 
 
 def get_meta(c: sqlite3.Connection) -> dict:
@@ -2033,17 +2047,69 @@ def ensure_existing_order_metadata() -> None:
         c.commit()
 
 
-if __name__ == "__main__":
-    init_db()
-    run_pending_migrations()
-    ensure_existing_order_numbers()
-    ensure_existing_order_metadata()
-    # Se existir um Excel já editado com a aba Base CPDs, recarrega essa base ao iniciar.
+def verificar_e_avisar_migracao_pendente() -> dict:
+    """Detecta migração de schema pendente e só registra aviso no log.
+
+    Nunca altera o banco. Usada no início do servidor quando
+    deve_aplicar_migracoes_automaticamente() é False, para que quem opera o
+    sistema saiba que há uma migração esperando uma decisão explícita
+    (PCP_APLICAR_MIGRACOES=1), em vez de simplesmente não dizer nada.
+    """
+    with lock, conn() as c:
+        versao_atual = db_manutencao.get_schema_version(c)
+    pendente = versao_atual in db_manutencao.MIGRATIONS
+    if pendente:
+        log(
+            f"[migracao] Há migração pendente (schema_version={versao_atual} de "
+            f"{db_manutencao.LATEST_SCHEMA_VERSION}), mas PCP_APLICAR_MIGRACOES não "
+            "está definida como '1'; nada foi alterado. Defina PCP_APLICAR_MIGRACOES=1 "
+            "e reinicie para aplicar deliberadamente."
+        )
+    return {"pendente": pendente, "versao_atual": versao_atual}
+
+
+def deve_importar_cpds_na_inicializacao() -> bool:
+    """Só reimporta CPDs do Excel automaticamente ao iniciar se
+    PCP_IMPORTAR_CPDS_INICIALIZACAO=1.
+
+    Por padrão (variável ausente ou com qualquer outro valor, incluindo
+    "0") o servidor NÃO abre o Excel nem chama import_cpds_from_excel_file()
+    sozinho — evita criar uma auditoria de import a cada reinício mesmo
+    quando nenhum CPD mudou. Importação controlada continua disponível via
+    scripts/importar_cpds_excel.py.
+    """
+    return os.environ.get("PCP_IMPORTAR_CPDS_INICIALIZACAO") == "1"
+
+
+def executar_importacao_cpds_na_inicializacao() -> dict:
+    """Chamada pelo __main__ na inicialização: só abre o Excel e chama
+    import_cpds_from_excel_file() se deve_importar_cpds_na_inicializacao()
+    for True. Caso contrário, só registra no log que está desativada — não
+    toca no Excel, não importa nada, não cria auditoria. Para importar de
+    forma controlada, use scripts/importar_cpds_excel.py.
+    """
+    if not deve_importar_cpds_na_inicializacao():
+        log("Importação automática de CPDs desativada.")
+        return {"importou": False}
     if EXCEL_FILE.exists() and load_workbook is not None:
         try:
-            import_cpds_from_excel_file(EXCEL_FILE, actor="Sistema/Inicialização")
+            resultado = import_cpds_from_excel_file(EXCEL_FILE, actor="Sistema/Inicialização")
+            return {"importou": True, "cpds": resultado["imported"]["cpds"]}
         except Exception:
             log("Não consegui recarregar CPDs do Excel na inicialização:\n" + traceback.format_exc())
+            return {"importou": False, "erro": True}
+    return {"importou": False, "motivo": "excel_ausente_ou_openpyxl_indisponivel"}
+
+
+if __name__ == "__main__":
+    init_db()
+    if deve_aplicar_migracoes_automaticamente():
+        run_pending_migrations()
+    else:
+        verificar_e_avisar_migracao_pendente()
+    ensure_existing_order_numbers()
+    ensure_existing_order_metadata()
+    executar_importacao_cpds_na_inicializacao()
     # Gera um Excel inicial caso ainda não exista.
     if not EXCEL_FILE.exists():
         save_excel_snapshot_safely()
