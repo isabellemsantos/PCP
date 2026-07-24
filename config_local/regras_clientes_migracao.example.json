@@ -1,0 +1,23 @@
+{
+  "_comentario": "Modelo fictício. Copie para regras_clientes_migracao.json (ignorado pelo Git) e preencha com as regras reais aprovadas.",
+  "grupo_honda": [
+    "CLIENTE FICTICIO A",
+    "CLIENTE FICTICIO B"
+  ],
+  "aliases": {
+    "CLIENTE FICTICIO CANONICO": [
+      "CLIENTE FICTICIO VARIANTE 1",
+      "CLIENTE FICTICIO VARIANTE 2"
+    ]
+  },
+  "placeholders_invalidos": [
+    "",
+    "-",
+    ".",
+    "N/A",
+    "NA",
+    "S/CLIENTE",
+    "SEM CLIENTE",
+    "SEMCLIENTE"
+  ]
+}

@@ -52,7 +52,7 @@ SCHEMA_VERSION_KEY = "schema_version"
 # Versão de schema mais recente conhecida por este módulo. Mantida em sincronia
 # com MIGRATIONS por um assert logo após o registro da última migração —
 # nunca espalhar o número "3" (ou o que vier depois) por outros arquivos.
-LATEST_SCHEMA_VERSION = 3
+LATEST_SCHEMA_VERSION = 5
 
 
 def _log_default(msg: str) -> None:
@@ -906,6 +906,200 @@ def migrar_v2_para_v3(c: sqlite3.Connection) -> None:
 
 
 MIGRATIONS[2] = migrar_v2_para_v3
+
+
+# ---------------------------------------------------------------------------
+# 9) Migração schema_version 3 -> 4: rastreabilidade de descrições e pendências
+# ---------------------------------------------------------------------------
+#
+# Duas tabelas novas, sem mexer em nada existente:
+#
+# - cpd_descricoes_fontes: guarda TODAS as descrições encontradas para um
+#   código completo (lista oficial, manual_cpd, pedido ou geradas pela
+#   própria migração), de onde vieram, e qual delas (no máximo uma) está
+#   marcada como canônica -- reforçado por um índice único parcial
+#   (só entre as linhas com descricao_canonica=1), não por regra de aplicação.
+# - cpd_pendencias_revisao: pendências geradas automaticamente quando a
+#   migração não pode decidir sozinha (zero à esquerda de confiança
+#   média/baixa, conflito de descrição categoria C/D, duplicidade na lista
+#   oficial, pai ausente, cliente indefinido), para revisão humana futura.
+
+_CPD_DESCRICOES_FONTES_SQL = """
+    CREATE TABLE IF NOT EXISTS cpd_descricoes_fontes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cpd_id INTEGER NOT NULL REFERENCES cpds(id) ON DELETE RESTRICT,
+        cpd_variacao_id INTEGER REFERENCES cpd_variacoes(id) ON DELETE SET NULL,
+        codigo_completo TEXT NOT NULL,
+        descricao TEXT,
+        fonte TEXT NOT NULL,
+        referencia_origem TEXT,
+        cliente_origem TEXT,
+        data_origem TEXT,
+        descricao_canonica INTEGER NOT NULL DEFAULT 0,
+        criado_em TEXT NOT NULL,
+        CHECK (fonte IN ('LISTA_OFICIAL', 'MANUAL_CPD', 'PEDIDO', 'MIGRACAO')),
+        CHECK (descricao_canonica IN (0, 1))
+    )
+"""
+
+_CPD_PENDENCIAS_REVISAO_SQL = """
+    CREATE TABLE IF NOT EXISTS cpd_pendencias_revisao (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cpd_id INTEGER REFERENCES cpds(id) ON DELETE SET NULL,
+        cpd_variacao_id INTEGER REFERENCES cpd_variacoes(id) ON DELETE SET NULL,
+        codigo_completo TEXT NOT NULL,
+        tipo TEXT NOT NULL,
+        nivel_confianca TEXT,
+        detalhes_json TEXT,
+        status TEXT NOT NULL DEFAULT 'PENDENTE',
+        resolvido_por_usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+        criado_em TEXT NOT NULL,
+        resolvido_em TEXT,
+        CHECK (tipo IN ('ZERO_ESQUERDA', 'CONFLITO_DESCRICAO', 'DUPLICIDADE_LISTA', 'PAI_AUSENTE', 'CLIENTE_INDEFINIDO', 'FORMATO_AMBIGUO', 'CODIGO_INVALIDO')),
+        CHECK (status IN ('PENDENTE', 'RESOLVIDO', 'IGNORADO')),
+        CHECK (nivel_confianca IS NULL OR nivel_confianca IN ('alta', 'media', 'baixa'))
+    )
+"""
+
+_V4_TABELAS: tuple[str, ...] = (_CPD_DESCRICOES_FONTES_SQL, _CPD_PENDENCIAS_REVISAO_SQL)
+
+_V4_INDICES: tuple[str, ...] = (
+    # Único parcial: garante no máximo 1 descrição canônica por código completo.
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_descricao_canonica_unica ON cpd_descricoes_fontes(codigo_completo) WHERE descricao_canonica=1",
+    "CREATE INDEX IF NOT EXISTS idx_descricoes_fontes_codigo ON cpd_descricoes_fontes(codigo_completo)",
+    "CREATE INDEX IF NOT EXISTS idx_descricoes_fontes_cpd ON cpd_descricoes_fontes(cpd_id)",
+    "CREATE INDEX IF NOT EXISTS idx_pendencias_codigo ON cpd_pendencias_revisao(codigo_completo)",
+    "CREATE INDEX IF NOT EXISTS idx_pendencias_tipo ON cpd_pendencias_revisao(tipo)",
+    "CREATE INDEX IF NOT EXISTS idx_pendencias_status ON cpd_pendencias_revisao(status)",
+    "CREATE INDEX IF NOT EXISTS idx_pendencias_cpd ON cpd_pendencias_revisao(cpd_id)",
+    "CREATE INDEX IF NOT EXISTS idx_pendencias_variacao ON cpd_pendencias_revisao(cpd_variacao_id)",
+)
+
+
+def migrar_v3_para_v4(c: sqlite3.Connection) -> None:
+    """Migração de schema_version 3 -> 4: rastreabilidade de descrições e pendências.
+
+    Cria cpd_descricoes_fontes e cpd_pendencias_revisao -- só estruturas
+    novas, nada existente é alterado. Idempotente (CREATE TABLE/INDEX IF NOT
+    EXISTS). Roda dentro da transação e do backup pré-migração já garantidos
+    por run_migrations().
+    """
+    for statement in _V4_TABELAS:
+        c.execute(statement)
+    for statement in _V4_INDICES:
+        c.execute(statement)
+
+    violacoes = c.execute("PRAGMA foreign_key_check").fetchall()
+    if violacoes:
+        raise RuntimeError(f"Migração v3->v4 abortada: foreign_key_check encontrou violações: {violacoes}")
+
+
+MIGRATIONS[3] = migrar_v3_para_v4
+
+
+# ---------------------------------------------------------------------------
+# 10) Migração schema_version 4 -> 5: cadastro separado de arruelas
+# ---------------------------------------------------------------------------
+#
+# Códigos alfanuméricos como "XY-090" (verificados na lista oficial real:
+# sempre 2 letras + hífen + 2-3 dígitos) não são CPDs --
+# são um tipo de item completamente diferente (arruelas). Em vez de forçar
+# esses códigos nas tabelas de CPD (cpds/cpd_variacoes), ganham seu próprio
+# cadastro, espelhando exatamente os mesmos padrões já usados nas tabelas de
+# CPD: FKs com ON DELETE apropriado, timestamps, unicidade (código único por
+# arruela, no máximo 1 descrição canônica por código via índice único
+# parcial), tudo dentro do backup + transação + verificação de
+# foreign_key_check que run_migrations() já garante. Nenhuma tabela de CPD é
+# alterada por esta migração.
+#
+# IMPORTANTE: esta migração é só uma PROPOSTA registrada em MIGRATIONS --
+# não é aplicada no pcp.sqlite3 real enquanto a interface/API não estiver
+# preparada para ler estas tabelas novas (ver plano_integracao_interface_novas_tabelas.md).
+
+_ARRUELAS_SQL = """
+    CREATE TABLE IF NOT EXISTS arruelas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        codigo TEXT NOT NULL UNIQUE,
+        descricao_padrao TEXT,
+        ativo INTEGER NOT NULL DEFAULT 1,
+        criado_em TEXT NOT NULL,
+        atualizado_em TEXT NOT NULL,
+        desativado_em TEXT
+    )
+"""
+
+_CLIENTE_ARRUELAS_SQL = """
+    CREATE TABLE IF NOT EXISTS cliente_arruelas (
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+        arruela_id INTEGER NOT NULL REFERENCES arruelas(id) ON DELETE CASCADE,
+        origem TEXT NOT NULL,
+        criado_em TEXT NOT NULL,
+        PRIMARY KEY (cliente_id, arruela_id),
+        CHECK (origem IN ('LISTA_OFICIAL', 'PEDIDO', 'AMBAS'))
+    )
+"""
+
+_GRUPO_ARRUELAS_SQL = """
+    CREATE TABLE IF NOT EXISTS grupo_arruelas (
+        grupo_id INTEGER NOT NULL REFERENCES grupos_clientes(id) ON DELETE CASCADE,
+        arruela_id INTEGER NOT NULL REFERENCES arruelas(id) ON DELETE CASCADE,
+        criado_em TEXT NOT NULL,
+        PRIMARY KEY (grupo_id, arruela_id)
+    )
+"""
+
+_ARRUELA_DESCRICOES_FONTES_SQL = """
+    CREATE TABLE IF NOT EXISTS arruela_descricoes_fontes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        arruela_id INTEGER NOT NULL REFERENCES arruelas(id) ON DELETE RESTRICT,
+        codigo_original TEXT NOT NULL,
+        descricao TEXT,
+        fonte TEXT NOT NULL,
+        referencia_origem TEXT,
+        cliente_origem TEXT,
+        descricao_canonica INTEGER NOT NULL DEFAULT 0,
+        criado_em TEXT NOT NULL,
+        CHECK (fonte IN ('LISTA_OFICIAL', 'MANUAL_CPD', 'PEDIDO', 'MIGRACAO')),
+        CHECK (descricao_canonica IN (0, 1))
+    )
+"""
+
+_V5_TABELAS: tuple[str, ...] = (
+    _ARRUELAS_SQL, _CLIENTE_ARRUELAS_SQL, _GRUPO_ARRUELAS_SQL, _ARRUELA_DESCRICOES_FONTES_SQL,
+)
+
+_V5_INDICES: tuple[str, ...] = (
+    # Único parcial: garante no máximo 1 descrição canônica por código de arruela.
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_arruela_descricao_canonica_unica ON arruela_descricoes_fontes(codigo_original) WHERE descricao_canonica=1",
+    "CREATE INDEX IF NOT EXISTS idx_arruela_descricoes_fontes_codigo ON arruela_descricoes_fontes(codigo_original)",
+    "CREATE INDEX IF NOT EXISTS idx_arruela_descricoes_fontes_arruela ON arruela_descricoes_fontes(arruela_id)",
+    "CREATE INDEX IF NOT EXISTS idx_cliente_arruelas_cliente ON cliente_arruelas(cliente_id)",
+    "CREATE INDEX IF NOT EXISTS idx_cliente_arruelas_arruela ON cliente_arruelas(arruela_id)",
+    "CREATE INDEX IF NOT EXISTS idx_grupo_arruelas_grupo ON grupo_arruelas(grupo_id)",
+    "CREATE INDEX IF NOT EXISTS idx_grupo_arruelas_arruela ON grupo_arruelas(arruela_id)",
+)
+
+
+def migrar_v4_para_v5(c: sqlite3.Connection) -> None:
+    """Migração de schema_version 4 -> 5: cadastro separado de arruelas.
+
+    Cria arruelas, cliente_arruelas, grupo_arruelas e
+    arruela_descricoes_fontes -- só estruturas novas, nada existente (incluindo
+    cpds/cpd_variacoes) é alterado. Idempotente (CREATE TABLE/INDEX IF NOT
+    EXISTS). Roda dentro da transação e do backup pré-migração já garantidos
+    por run_migrations().
+    """
+    for statement in _V5_TABELAS:
+        c.execute(statement)
+    for statement in _V5_INDICES:
+        c.execute(statement)
+
+    violacoes = c.execute("PRAGMA foreign_key_check").fetchall()
+    if violacoes:
+        raise RuntimeError(f"Migração v4->v5 abortada: foreign_key_check encontrou violações: {violacoes}")
+
+
+MIGRATIONS[4] = migrar_v4_para_v5
 
 assert LATEST_SCHEMA_VERSION == max(MIGRATIONS) + 1, (
     "LATEST_SCHEMA_VERSION desalinhada com MIGRATIONS: atualize a constante "
