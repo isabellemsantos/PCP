@@ -27,3 +27,15 @@ dados_pcp_pendente.xlsx
 
 # Backups históricos em zip
 HISTÓRICO/*.zip
+
+# Relatórios de análise de migração (gerados sob demanda, podem conter dados reais)
+relatorios_migracao/
+
+# Planilhas de importação oficial (dados reais, não deve ser versionada)
+importacao/
+
+# Configuração local de regras reais de clientes (nomes reais de clientes,
+# aliases e grupos -- nunca versionar). Só o modelo fictício (.example.json)
+# é versionado.
+config_local/*.json
+!config_local/*.example.json

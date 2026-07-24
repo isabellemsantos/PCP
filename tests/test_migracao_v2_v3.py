@@ -208,19 +208,30 @@ class TransicaoVersaoTest(MigracaoV2V3TestCase):
         self.assertIn(2, self.dbm.MIGRATIONS)
         self.assertIs(self.dbm.MIGRATIONS[2], self.dbm.migrar_v2_para_v3)
 
-    def test_latest_schema_version_e_3(self):
-        self.assertEqual(self.dbm.LATEST_SCHEMA_VERSION, 3)
+    def test_latest_schema_version_e_pelo_menos_3(self):
+        # Não fixamos um valor exato: outras migrações (v3->v4 etc.) podem
+        # ter sido registradas depois que este arquivo foi escrito. O que
+        # importa aqui é que, com migrar_v2_para_v3 registrada, a versão
+        # mais recente nunca pode ser menor que 3.
+        self.assertGreaterEqual(self.dbm.LATEST_SCHEMA_VERSION, 3)
 
-    def test_migracoes_pendentes_por_versao(self):
-        self.assertEqual(self.dbm.migracoes_pendentes(1), [2, 3])
-        self.assertEqual(self.dbm.migracoes_pendentes(2), [3])
-        self.assertEqual(self.dbm.migracoes_pendentes(3), [])
+    def test_migracoes_pendentes_de_2_inclui_3(self):
+        # Idem: não fixamos a cauda completa (pode incluir 4, 5... depois),
+        # só que migrar de 2 sempre passa por 3 primeiro.
+        self.assertEqual(self.dbm.migracoes_pendentes(2)[0], 3)
 
     def test_banco_v2_termina_em_v3(self):
+        # Chama migrar_v2_para_v3() diretamente (não via run_migrations):
+        # como outras migrações podem existir depois desta (v3->v4 etc.),
+        # run_migrations() encadearia além da v3, o que não é o que este
+        # teste específico verifica (isso é coberto em
+        # tests.test_migracao_v3_v4 e em qualquer migração futura).
         db = self._copia_v2("v2_para_v3")
-        resultado = self._migrar(db)
-        self.assertEqual(resultado["versao_final"], 3)
-        self.assertEqual(resultado["migracoes_aplicadas"], [3])
+        with sqlite3.connect(str(db)) as c:
+            c.execute("PRAGMA foreign_keys=ON")
+            self.dbm.migrar_v2_para_v3(c)
+            self.dbm.set_schema_version(c, 3)
+            c.commit()
         with sqlite3.connect(str(db)) as c:
             self.assertEqual(self.dbm.get_schema_version(c), 3)
 
@@ -228,17 +239,17 @@ class TransicaoVersaoTest(MigracaoV2V3TestCase):
         db = self._copia_v2("v3_no_op")
         primeiro = self._migrar(db, self.tmp_dir / "backups_noop1")
         segundo = self._migrar(db, self.tmp_dir / "backups_noop2")
-        self.assertEqual(primeiro["migracoes_aplicadas"], [3])
+        self.assertEqual(primeiro["versao_final"], self.dbm.LATEST_SCHEMA_VERSION)
         self.assertEqual(segundo["migracoes_aplicadas"], [])
-        self.assertEqual(segundo["versao_final"], 3)
+        self.assertEqual(segundo["versao_final"], self.dbm.LATEST_SCHEMA_VERSION)
 
     def test_banco_v1_executa_1_2_3_corretamente(self):
         db = self._copia_v1("v1_para_v3")
         resultado = self._migrar(db)
-        self.assertEqual(resultado["versao_final"], 3)
-        self.assertEqual(resultado["migracoes_aplicadas"], [2, 3])
+        self.assertEqual(resultado["versao_final"], self.dbm.LATEST_SCHEMA_VERSION)
+        self.assertIn(3, resultado["migracoes_aplicadas"])
         with sqlite3.connect(str(db)) as c:
-            self.assertEqual(self.dbm.get_schema_version(c), 3)
+            self.assertEqual(self.dbm.get_schema_version(c), self.dbm.LATEST_SCHEMA_VERSION)
             tabelas = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         for antiga in ("meta", "orders", "sections", "manual_cpd", "audit_log"):
             self.assertIn(antiga, tabelas, f"Tabela antiga {antiga} deveria continuar existindo")
