@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cadastros e Configurações - PCP</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --bg:#14171c; --bg-elevated:#1b1f27; --bg-elevated-2:#242a35;
+    --sidebar-bg:#0c0f15; --sidebar-hover:#171c26; --sidebar-active:#1d3a6b;
+    --border:rgba(255,255,255,.08); --border-strong:rgba(255,255,255,.16);
+    --text:#f2f4f7; --text2:#aeb6c2; --text3:#727a88;
+    --blue:#2f6feb; --blue-bg:rgba(47,111,235,.16); --blue-border:#2f6feb;
+    --red:#ef4444; --red-bg:rgba(239,68,68,.14); --red-border:#ef4444;
+    --green:#22c55e; --green-bg:rgba(34,197,94,.14); --green-border:#22c55e;
+    --amber:#f59e0b; --amber-bg:rgba(245,158,11,.14); --amber-border:#f59e0b;
+    --radius:8px; --radius-lg:14px;
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --mono:'Courier New',monospace;
+    --sidebar-w:230px; --sidebar-w-collapsed:64px;
+  }
+  html,body{height:100%;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;display:flex;min-height:100vh;}
+  button{font-family:var(--font);font-size:12.5px;border-radius:var(--radius);border:1px solid var(--border-strong);background:var(--bg-elevated-2);color:var(--text);padding:7px 13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s,opacity .15s;}
+  button:hover{background:#2c3340;}
+  button.primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+  button.primary:hover{opacity:.88;}
+  button.small{padding:4px 10px;font-size:11px;}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  input[type=text],select{
+    width:100%;background:var(--bg-elevated-2);border:1px solid var(--border-strong);border-radius:var(--radius);
+    padding:7px 9px;font-family:var(--font);font-size:12.5px;color:var(--text);outline:none;
+  }
+  input::placeholder{color:var(--text3);}
+  input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-bg);}
+  a{color:var(--blue);}
+  svg.icon{width:17px;height:17px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+  /* ---- Sidebar ---- */
+  .sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--sidebar-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:sticky;top:0;transition:width .18s ease;overflow:hidden;}
+  .sidebar.collapsed{width:var(--sidebar-w-collapsed);}
+  .sidebar-brand{display:flex;align-items:center;gap:9px;padding:16px 16px 14px;font-size:17px;font-weight:800;color:#fff;white-space:nowrap;}
+  .sidebar-brand .dot{width:9px;height:9px;border-radius:50%;background:var(--blue);flex-shrink:0;}
+  .sidebar-scroll{flex:1;overflow-y:auto;padding:4px 10px;}
+  .nav-group{margin-top:14px;}
+  .nav-group-label{font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--text3);text-transform:uppercase;padding:4px 10px 6px;white-space:nowrap;}
+  .sidebar.collapsed .nav-group-label,.sidebar.collapsed .nav-label,.sidebar.collapsed .nav-badge,.sidebar.collapsed .sidebar-brand span{display:none;}
+  .sidebar.collapsed .sidebar-brand{justify-content:center;padding:16px 0 14px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--radius);color:var(--text2);cursor:pointer;font-size:13px;white-space:nowrap;margin-bottom:2px;position:relative;}
+  .nav-item:hover{background:var(--sidebar-hover);color:var(--text);}
+  .nav-item.on{background:var(--sidebar-active);color:#fff;font-weight:600;}
+  .nav-item .chevron{margin-left:auto;transition:transform .15s;}
+  .nav-item.expanded .chevron{transform:rotate(90deg);}
+  .nav-badge{margin-left:auto;font-size:10.5px;font-weight:700;background:var(--red);color:#fff;border-radius:20px;padding:1px 7px;}
+  .nav-sub{padding-left:14px;max-height:0;overflow:hidden;transition:max-height .18s ease;}
+  .nav-sub.open{max-height:120px;}
+  .nav-sub .nav-item{font-size:12.5px;padding:7px 10px;}
+  .nav-item.disabled{opacity:.5;cursor:default;}
+  .nav-item.disabled:hover{background:none;color:var(--text2);}
+  .sidebar-toggle{margin:8px 10px 14px;display:flex;justify-content:center;}
+  .sidebar-toggle button{width:100%;justify-content:center;padding:8px;}
+
+  /* ---- Main ---- */
+  .app-main{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow-y:auto;}
+  .demo-banner{background:var(--red);color:#fff;font-weight:800;text-align:center;padding:8px 12px;font-size:12px;letter-spacing:.4px;text-transform:uppercase;}
+  .topbar{background:var(--bg-elevated);border-bottom:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:20;}
+  .topbar-title{font-size:17px;font-weight:700;display:flex;align-items:center;gap:9px;}
+  .readonly-pill{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);border-radius:20px;padding:3px 10px;}
+  .content{padding:20px 22px 50px;max-width:1400px;width:100%;margin:0 auto;}
+  .hidden{display:none!important;}
+
+  /* ---- Cards ---- */
+  .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;}
+  .card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;display:flex;align-items:center;gap:12px;}
+  .card .icon-wrap{width:38px;height:38px;border-radius:10px;background:var(--blue-bg);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .card.alert .icon-wrap{background:var(--red-bg);color:var(--red);}
+  .card .card-val{font-size:22px;font-weight:800;line-height:1.1;}
+  .card.alert .card-val{color:var(--red);}
+  .card .card-lbl{font-size:11px;color:var(--text2);margin-top:1px;}
+  @media (max-width:1100px){.cards{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:700px){.cards{grid-template-columns:repeat(2,1fr);}}
+
+  .panels-row{display:grid;grid-template-columns:1fr 1.3fr;gap:14px;margin-bottom:18px;}
+  @media (max-width:900px){.panels-row{grid-template-columns:1fr;}}
+  .panel-box{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;}
+  .panel-box h3{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+  .kpi-row{margin-bottom:12px;}
+  .kpi-row:last-child{margin-bottom:0;}
+  .kpi-row-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;}
+  .kpi-row-top b{font-size:14px;}
+  .kpi-track{height:8px;border-radius:5px;background:var(--bg-elevated-2);overflow:hidden;}
+  .kpi-fill{height:100%;background:var(--blue);border-radius:5px;}
+  .kpi-indisponivel{color:var(--text3);font-size:11.5px;font-style:italic;}
+  .updated-note{font-size:11px;color:var(--text3);margin-top:10px;display:flex;align-items:center;gap:6px;}
+
+  .quick-tabs{display:flex;gap:6px;margin-bottom:10px;}
+  .quick-tab{padding:6px 12px;font-size:11.5px;border-radius:20px;border:1px solid var(--border-strong);background:var(--bg-elevated-2);color:var(--text2);cursor:pointer;}
+  .quick-tab.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .quick-filters{display:flex;gap:8px;margin-bottom:10px;}
+  .quick-filters input,.quick-filters select{font-size:12px;}
+
+  /* ---- Filters bar ---- */
+  .filters-bar{display:flex;gap:10px;margin:0 0 14px;flex-wrap:wrap;align-items:flex-end;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px;}
+  .filter-field{min-width:150px;}
+  .filter-field.search-field{min-width:220px;flex:1;}
+  .filter-field label{display:block;font-size:10.5px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px;}
+
+  /* ---- Badges ---- */
+  .badge{font-size:10.5px;padding:2px 8px;border-radius:20px;border:1px solid var(--border-strong);background:var(--bg-elevated-2);color:var(--text2);white-space:nowrap;}
+  .badge.b-grupo{background:var(--blue-bg);color:#8fb4f7;border-color:var(--blue-border);}
+  .badge.b-ok{background:var(--green-bg);color:var(--green);border-color:var(--green-border);}
+  .badge.b-off{background:var(--bg-elevated-2);color:var(--text3);}
+  .badge.b-pendente{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border);}
+  .badge.b-resolvido{background:var(--green-bg);color:var(--green);border-color:var(--green-border);}
+  .badge.b-ignorado{background:var(--bg-elevated-2);color:var(--text3);}
+  .badge.b-tipo-cpd{background:var(--blue-bg);color:#8fb4f7;border-color:var(--blue-border);}
+  .badge.b-tipo-arruela{background:rgba(168,85,247,.16);color:#c4a3f7;border-color:#a855f7;}
+
+  /* ---- Tables ---- */
+  .table-wrap{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+  .table-scroll{overflow-x:auto;}
+  table{width:100%;min-width:640px;border-collapse:collapse;font-size:12.5px;}
+  thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--text2);padding:10px 14px;border-bottom:1px solid var(--border-strong);background:var(--bg-elevated-2);}
+  tbody td{padding:9px 14px;border-bottom:1px solid var(--border);}
+  tbody tr{cursor:pointer;}
+  tbody tr:hover{background:var(--bg-elevated-2);}
+  tbody tr:last-child td{border-bottom:none;}
+  .mono{font-family:var(--mono);font-weight:700;}
+  tbody tr:focus-visible{outline:2px solid var(--blue);outline-offset:-2px;background:var(--bg-elevated-2);}
+  button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+
+  .pagination{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 14px;font-size:12px;color:var(--text2);}
+
+  .empty{text-align:center;padding:40px 0;color:var(--text3);font-size:12.5px;}
+  .loading{text-align:center;padding:40px 0;color:var(--text2);font-size:12.5px;}
+  .error-banner{background:var(--red-bg);color:#fca5a5;border:1px solid var(--red-border);border-radius:var(--radius-lg);padding:14px;margin-bottom:14px;font-size:12.5px;}
+
+  .placeholder-view{background:var(--bg-elevated);border:1px dashed var(--border-strong);border-radius:var(--radius-lg);padding:40px;text-align:center;color:var(--text2);}
+  .placeholder-view h2{color:var(--text);margin-bottom:8px;font-size:16px;}
+
+  /* ---- Detail panel ---- */
+  .panel-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:stretch;justify-content:flex-end;z-index:9999;}
+  .panel-overlay.open{display:flex;}
+  .panel{width:min(480px,100%);background:var(--bg-elevated);border-left:1px solid var(--border-strong);box-shadow:-12px 0 40px rgba(0,0,0,.45);padding:18px;overflow-y:auto;}
+  .panel h2{font-size:16px;margin-bottom:4px;}
+  .panel .panel-sub{color:var(--text2);font-size:11.5px;margin-bottom:14px;}
+  .panel-section{margin-bottom:14px;}
+  .panel-section h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--text2);margin-bottom:6px;}
+  .panel-row{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--border);}
+  .panel-close{float:right;}
+  .chip-list{display:flex;gap:6px;flex-wrap:wrap;}
+
+  @media (max-width:760px){
+    .sidebar{position:fixed;z-index:100;width:var(--sidebar-w-collapsed);}
+    .app-main{margin-left:var(--sidebar-w-collapsed);}
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand"><span class="dot"></span><span>PCP</span></div>
+  <div class="sidebar-scroll">
+    <div class="nav-group">
+      <div class="nav-group-label">Visão Geral</div>
+      <div class="nav-item" data-view="geral" onclick="irPara('geral')">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+        <span class="nav-label">Visão Geral</span>
+      </div>
+      <div class="nav-item" data-view="kpis" onclick="irPara('kpis')">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 19v-6"/><path d="M12 19V9"/><path d="M16 19v-4"/></svg>
+        <span class="nav-label">KPIs</span>
+      </div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Consulta</div>
+      <div class="nav-item" id="nav-consulta" onclick="toggleConsulta()">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span class="nav-label">Consulta</span>
+        <svg class="icon chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </div>
+      <div class="nav-sub" id="sub-consulta">
+        <div class="nav-item" data-view="itens" onclick="irPara('itens')">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16"/></svg>
+          <span class="nav-label">Itens</span>
+        </div>
+        <div class="nav-item" data-view="clientes" onclick="irPara('clientes')">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 14a5 5 0 0 1 5.5 5"/></svg>
+          <span class="nav-label">Clientes</span>
+        </div>
+      </div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Acompanhamento</div>
+      <div class="nav-item" data-view="pendencias" onclick="irPara('pendencias')">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg>
+        <span class="nav-label">Pendências</span>
+        <span class="nav-badge" id="badge-pendencias">0</span>
+      </div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Administração</div>
+      <div class="nav-item" data-view="cadastros" onclick="irPara('cadastros')">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/></svg>
+        <span class="nav-label">Cadastros</span>
+      </div>
+      <div class="nav-item" data-view="configuracoes" onclick="irPara('configuracoes')">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <span class="nav-label">Configurações</span>
+      </div>
+    </div>
+  </div>
+  <div class="sidebar-toggle">
+    <button onclick="toggleSidebar()" title="Recolher/expandir menu">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="app-main">
+  <!--DEMO_BANNER-->
+
+  <div class="topbar">
+    <div class="topbar-title" id="titulo-view">Visão Geral <span class="readonly-pill">Somente consulta</span></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <a href="/" style="text-decoration:none;font-size:12.5px;color:var(--text2);">&larr; Voltar ao controle de pedidos</a>
+      <button onclick="atualizarViewAtual()">&#8635; Atualizar</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="erro-global" class="error-banner hidden"></div>
+
+    <!-- VISÃO GERAL -->
+    <div id="view-geral" class="view">
+      <div class="cards" id="cards-geral"></div>
+      <div class="panels-row">
+        <div class="panel-box">
+          <h3>KPIs rápidos</h3>
+          <div id="kpis-rapidos"><div class="loading">Carregando...</div></div>
+        </div>
+        <div class="panel-box">
+          <h3>Consulta rápida</h3>
+          <div class="quick-tabs">
+            <div class="quick-tab on" id="qtab-itens" onclick="setQuickTab('itens')">Itens</div>
+            <div class="quick-tab" id="qtab-clientes" onclick="setQuickTab('clientes')">Clientes</div>
+          </div>
+          <div class="quick-filters">
+            <input type="text" id="quick-busca" placeholder="Buscar..." oninput="debounceQuick()">
+            <select id="quick-grupo" onchange="carregarConsultaRapida()">
+              <option value="">Todos os grupos</option>
+              <option value="Honda">Honda</option>
+              <option value="Diversos">Diversos</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <div class="table-scroll"><table id="tabela-quick"><thead></thead><tbody></tbody></table></div>
+            <div id="estado-quick"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-box">
+        <h3>Pendências recentes</h3>
+        <div id="pendencias-recentes"><div class="loading">Carregando...</div></div>
+      </div>
+      <div class="updated-note" id="atualizado-em"></div>
+    </div>
+
+    <!-- KPIS -->
+    <div id="view-kpis" class="view hidden">
+      <div class="panel-box" style="margin-bottom:14px;">
+        <h3>Indicadores operacionais (sistema legado)</h3>
+        <div id="kpi-pedidos-ativos" class="kpi-row"></div>
+        <div id="kpi-pedidos-atrasados" class="kpi-row"></div>
+        <div id="kpi-pedidos-criticos" class="kpi-row"></div>
+      </div>
+      <div class="panel-box" style="margin-bottom:14px;">
+        <h3>Itens e clientes</h3>
+        <div id="kpi-itens-por-cliente" class="kpi-row"></div>
+        <div id="kpi-clientes-por-grupo" class="kpi-row"></div>
+        <div id="kpi-itens-sem-cliente" class="kpi-row"></div>
+        <div id="kpi-itens-sem-descricao" class="kpi-row"></div>
+      </div>
+      <div class="panel-box">
+        <h3>Pendências por tipo</h3>
+        <div id="kpi-pendencias-por-tipo"></div>
+      </div>
+    </div>
+
+    <!-- CONSULTA - ITENS -->
+    <div id="view-itens" class="view hidden">
+      <div class="filters-bar">
+        <div class="filter-field search-field"><label>Busca</label><input type="text" id="item-busca" placeholder="Código ou descrição..." oninput="debounce('itens')"></div>
+        <div class="filter-field"><label>Tipo</label>
+          <select id="item-tipo" onchange="recarregar('itens')">
+            <option value="">Todos</option><option value="CPD">CPD</option><option value="ARRUELA">Arruela</option>
+          </select>
+        </div>
+        <div class="filter-field"><label>Cliente</label><input type="text" id="item-cliente" placeholder="Nome do cliente" oninput="debounce('itens')"></div>
+        <div class="filter-field"><label>Grupo</label><input type="text" id="item-grupo" placeholder="Ex.: Honda" oninput="debounce('itens')"></div>
+        <div class="filter-field"><label>Status</label>
+          <select id="item-ativo" onchange="recarregar('itens')">
+            <option value="">Todos</option><option value="1">Ativos</option><option value="0">Inativos</option>
+          </select>
+        </div>
+        <div class="filter-field"><label>Pendência</label>
+          <select id="item-pendencia" onchange="recarregar('itens')">
+            <option value="">Todos</option><option value="1">Com pendência</option><option value="0">Sem pendência</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>Código</th><th>Tipo</th><th>Descrição</th><th>Cliente(s)</th><th>Grupo(s)</th><th>Pendências</th><th>Status</th></tr></thead>
+          <tbody id="tbody-itens"></tbody>
+        </table>
+        </div>
+        <div id="estado-itens"></div>
+        <div class="pagination" id="pag-itens"></div>
+      </div>
+    </div>
+
+    <!-- CONSULTA - CLIENTES -->
+    <div id="view-clientes" class="view hidden">
+      <div class="filters-bar">
+        <div class="filter-field search-field"><label>Busca</label><input type="text" id="cli-busca" placeholder="Nome ou alias..." oninput="debounce('clientes')"></div>
+        <div class="filter-field"><label>Grupo</label><input type="text" id="cli-grupo" placeholder="Ex.: Honda" oninput="debounce('clientes')"></div>
+        <div class="filter-field"><label>Status</label>
+          <select id="cli-ativo" onchange="recarregar('clientes')">
+            <option value="">Todos</option><option value="1">Ativos</option><option value="0">Inativos</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>Cliente</th><th>Grupo</th><th>Itens</th><th>Pedidos</th><th>Status</th></tr></thead>
+          <tbody id="tbody-clientes"></tbody>
+        </table>
+        </div>
+        <div id="estado-clientes"></div>
+        <div class="pagination" id="pag-clientes"></div>
+      </div>
+    </div>
+
+    <!-- PENDENCIAS -->
+    <div id="view-pendencias" class="view hidden">
+      <div class="filters-bar">
+        <div class="filter-field search-field"><label>Código</label><input type="text" id="pen-codigo" placeholder="Código..." oninput="debounce('pendencias')"></div>
+        <div class="filter-field"><label>Tipo</label>
+          <select id="pen-tipo" onchange="recarregar('pendencias')">
+            <option value="">Todos</option>
+            <option value="ZERO_ESQUERDA">Zero à esquerda</option>
+            <option value="CONFLITO_DESCRICAO">Conflito de descrição</option>
+            <option value="DUPLICIDADE_LISTA">Duplicidade na lista</option>
+            <option value="PAI_AUSENTE">Pai ausente</option>
+            <option value="CLIENTE_INDEFINIDO">Cliente indefinido</option>
+            <option value="FORMATO_AMBIGUO">Formato ambíguo</option>
+            <option value="CODIGO_INVALIDO">Código inválido</option>
+          </select>
+        </div>
+        <div class="filter-field"><label>Status</label>
+          <select id="pen-status" onchange="recarregar('pendencias')">
+            <option value="">Todos</option><option value="PENDENTE">Pendente</option>
+            <option value="RESOLVIDO">Resolvido</option><option value="IGNORADO">Ignorado</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>Tipo</th><th>Item</th><th>Resumo</th><th>Origem</th><th>Status</th><th>Data</th><th></th></tr></thead>
+          <tbody id="tbody-pendencias"></tbody>
+        </table>
+        </div>
+        <div id="estado-pendencias"></div>
+        <div class="pagination" id="pag-pendencias"></div>
+      </div>
+    </div>
+
+    <!-- CADASTROS (placeholder) -->
+    <div id="view-cadastros" class="view hidden">
+      <div class="placeholder-view">
+        <h2>Cadastros</h2>
+        <p>Em desenvolvimento -- nesta fase o sistema oferece somente consulta. Ações de cadastrar, editar e excluir chegam numa etapa futura.</p>
+      </div>
+    </div>
+
+    <!-- CONFIGURAÇÕES (placeholder) -->
+    <div id="view-configuracoes" class="view hidden">
+      <div class="placeholder-view">
+        <h2>Configurações</h2>
+        <p>Em desenvolvimento.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="panel-overlay" id="panel-overlay" onclick="if(event.target===this) fecharPainel()">
+  <div class="panel" id="painel-detalhe">
+    <button class="panel-close small" onclick="fecharPainel()">Fechar ✕</button>
+    <div id="painel-conteudo"></div>
+  </div>
+</div>
+
+<script>
+const ESTADO = {
+  itens: {pagina:1, porPagina:25},
+  clientes: {pagina:1, porPagina:25},
+  pendencias: {pagina:1, porPagina:25},
+  quick: {tipo:'itens'},
+};
+const TITULOS = {
+  geral:'Visão Geral', kpis:'KPIs', itens:'Consulta de Itens', clientes:'Consulta de Clientes',
+  pendencias:'Pendências', cadastros:'Cadastros', configuracoes:'Configurações',
+};
+let viewAtual = 'geral';
+let debounceTimer = null;
+let debounceQuickTimer = null;
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+function toggleConsulta(){
+  document.getElementById('nav-consulta').classList.toggle('expanded');
+  document.getElementById('sub-consulta').classList.toggle('open');
+}
+
+function irPara(view){
+  viewAtual = view;
+  window.location.hash = view;
+  document.querySelectorAll('.nav-item[data-view]').forEach(el => el.classList.toggle('on', el.dataset.view === view));
+  document.querySelectorAll('.view').forEach(el => el.classList.add('hidden'));
+  document.getElementById('view-' + view).classList.remove('hidden');
+  document.getElementById('titulo-view').innerHTML = TITULOS[view] + ' <span class="readonly-pill">Somente consulta</span>';
+  if(view === 'itens' || view === 'clientes'){
+    document.getElementById('sub-consulta').classList.add('open');
+    document.getElementById('nav-consulta').classList.add('expanded');
+  }
+  carregarView(view);
+}
+
+function carregarView(view){
+  if(view === 'geral') carregarVisaoGeral();
+  else if(view === 'kpis') carregarKpis();
+  else if(view === 'itens') carregarItens();
+  else if(view === 'clientes') carregarClientes();
+  else if(view === 'pendencias') carregarPendencias();
+}
+
+function atualizarViewAtual(){
+  carregarView(viewAtual);
+  if(viewAtual === 'geral') return; // já recarrega os cards junto
+  carregarResumoParaBadge();
+}
+
+function debounce(aba){
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => recarregar(aba), 350);
+}
+function debounceQuick(){
+  clearTimeout(debounceQuickTimer);
+  debounceQuickTimer = setTimeout(carregarConsultaRapida, 350);
+}
+
+function mostrarErro(mensagem){
+  const el = document.getElementById('erro-global');
+  el.textContent = mensagem;
+  el.classList.remove('hidden');
+}
+function esconderErro(){
+  document.getElementById('erro-global').classList.add('hidden');
+}
+
+async function apiGet(url){
+  const resp = await fetch(url, {cache:'no-store'});
+  let dados = null;
+  try{ dados = await resp.json(); }catch(e){ dados = null; }
+  if(resp.status === 503 && dados && dados.codigo === 'CADASTROS_NOVOS_INDISPONIVEIS'){
+    throw new Error(dados.mensagem || 'Os novos cadastros ainda não foram habilitados neste banco.');
+  }
+  if(!resp.ok){
+    throw new Error((dados && dados.mensagem) || `Erro ao consultar o servidor (HTTP ${resp.status}).`);
+  }
+  return dados;
+}
+function montarQuery(params){
+  const usp = new URLSearchParams();
+  Object.entries(params).forEach(([k,v]) => { if(v !== '' && v !== null && v !== undefined) usp.set(k, v); });
+  return usp.toString();
+}
+function escapeHtml(valor){
+  if(valor === null || valor === undefined) return '';
+  return String(valor).replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function iconeSvg(path){
+  return `<svg class="icon" viewBox="0 0 24 24">${path}</svg>`;
+}
+const ICONE_CLIENTES = '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>';
+const ICONE_ITENS = '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16"/>';
+const ICONE_CPD = '<path d="M4 4h16v16H4z"/><path d="M8 4v16"/>';
+const ICONE_ARRUELA = '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>';
+const ICONE_ALERTA = '<path d="M12 3l9 16H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>';
+
+async function carregarResumoParaBadge(){
+  try{
+    const dados = await apiGet('/api/admin/resumo');
+    document.getElementById('badge-pendencias').textContent = dados.total_pendencias_abertas;
+    return dados;
+  }catch(e){
+    mostrarErro(e.message);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------
+// VISÃO GERAL
+// ---------------------------------------------------------------------
+
+async function carregarVisaoGeral(){
+  try{
+    const dados = await apiGet('/api/admin/resumo');
+    esconderErro();
+    document.getElementById('badge-pendencias').textContent = dados.total_pendencias_abertas;
+    document.getElementById('cards-geral').innerHTML = `
+      <div class="card">${iconeSvgWrap(ICONE_CLIENTES)}<div><div class="card-val">${dados.total_clientes_ativos}</div><div class="card-lbl">Clientes ativos</div></div></div>
+      <div class="card">${iconeSvgWrap(ICONE_ITENS)}<div><div class="card-val">${dados.total_itens}</div><div class="card-lbl">Itens</div></div></div>
+      <div class="card">${iconeSvgWrap(ICONE_CPD)}<div><div class="card-val">${dados.total_cpds}</div><div class="card-lbl">CPDs</div></div></div>
+      <div class="card">${iconeSvgWrap(ICONE_ARRUELA)}<div><div class="card-val">${dados.total_arruelas}</div><div class="card-lbl">Arruelas</div></div></div>
+      <div class="card alert">${iconeSvgWrap(ICONE_ALERTA)}<div><div class="card-val">${dados.total_pendencias_abertas}</div><div class="card-lbl">Pendências abertas</div></div></div>
+    `;
+    const tipos = Object.entries(dados.pendencias_por_tipo || {});
+    document.getElementById('kpis-rapidos').innerHTML = tipos.length ? tipos.map(([tipo, total]) => `
+      <div class="kpi-row"><div class="kpi-row-top"><span>${TIPO_LABELS[tipo] || escapeHtml(tipo)}</span><b>${total}</b></div>
+      <div class="kpi-track"><div class="kpi-fill" style="width:${Math.min(100, total*4)}%"></div></div></div>
+    `).join('') : '<div class="kpi-indisponivel">Nenhuma pendência aberta.</div>';
+
+    document.getElementById('atualizado-em').textContent = 'Atualizado em ' + new Date().toLocaleTimeString('pt-BR');
+    carregarConsultaRapida();
+    carregarPendenciasRecentes();
+  }catch(e){
+    mostrarErro(e.message);
+  }
+}
+
+function setQuickTab(tipo){
+  ESTADO.quick.tipo = tipo;
+  document.getElementById('qtab-itens').classList.toggle('on', tipo === 'itens');
+  document.getElementById('qtab-clientes').classList.toggle('on', tipo === 'clientes');
+  carregarConsultaRapida();
+}
+
+async function carregarConsultaRapida(){
+  const thead = document.querySelector('#tabela-quick thead');
+  const tbody = document.querySelector('#tabela-quick tbody');
+  const estado = document.getElementById('estado-quick');
+  estado.innerHTML = '<div class="loading">Carregando...</div>';
+  const busca = document.getElementById('quick-busca').value.trim();
+  const grupo = document.getElementById('quick-grupo').value;
+  try{
+    if(ESTADO.quick.tipo === 'itens'){
+      thead.innerHTML = '<tr><th>Código</th><th>Tipo</th><th>Cliente(s)</th><th>Status</th></tr>';
+      const dados = await apiGet('/api/admin/itens?' + montarQuery({busca, grupo, por_pagina:8}));
+      esconderErro();
+      if(dados.itens.length === 0){ tbody.innerHTML=''; estado.innerHTML = '<div class="empty">Nenhum item encontrado.</div>'; return; }
+      estado.innerHTML = '';
+      tbody.innerHTML = dados.itens.map(i => `<tr><td class="mono">${escapeHtml(i.codigo)}</td><td><span class="badge ${i.tipo==='CPD'?'b-tipo-cpd':'b-tipo-arruela'}">${i.tipo}</span></td><td>${i.clientes.map(escapeHtml).join(', ')||'-'}</td><td><span class="badge ${i.ativo?'b-ok':'b-off'}">${i.ativo?'Ativo':'Inativo'}</span></td></tr>`).join('');
+    } else {
+      thead.innerHTML = '<tr><th>Cliente</th><th>Grupo</th><th>Itens vinculados</th><th>Status</th></tr>';
+      const dados = await apiGet('/api/admin/clientes?' + montarQuery({busca, grupo, por_pagina:8}));
+      esconderErro();
+      if(dados.itens.length === 0){ tbody.innerHTML=''; estado.innerHTML = '<div class="empty">Nenhum cliente encontrado.</div>'; return; }
+      estado.innerHTML = '';
+      tbody.innerHTML = dados.itens.map(c => `<tr onclick="abrirDetalheCliente(${c.id})"><td>${escapeHtml(c.nome)}</td><td>${c.grupos.map(escapeHtml).join(', ')||'-'}</td><td>${c.total_cpds + c.total_arruelas} itens</td><td><span class="badge ${c.ativo?'b-ok':'b-off'}">${c.ativo?'Ativo':'Inativo'}</span></td></tr>`).join('');
+    }
+  }catch(e){
+    estado.innerHTML = '';
+    mostrarErro(e.message);
+  }
+}
+
+async function carregarPendenciasRecentes(){
+  const el = document.getElementById('pendencias-recentes');
+  try{
+    const dados = await apiGet('/api/admin/pendencias?por_pagina=5');
+    if(dados.itens.length === 0){ el.innerHTML = '<div class="empty">Nenhuma pendência registrada.</div>'; return; }
+    el.innerHTML = `<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Código</th><th>Status</th><th>Data</th></tr></thead><tbody>` +
+      dados.itens.map(p => `<tr onclick="abrirDetalhePendencia(${p.id})"><td>${TIPO_LABELS[p.tipo]||escapeHtml(p.tipo)}</td><td class="mono">${escapeHtml(p.codigo_completo)}</td><td><span class="badge ${STATUS_BADGE[p.status]||''}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.criado_em||'-')}</td></tr>`).join('') +
+      `</tbody></table></div></div>`;
+  }catch(e){
+    el.innerHTML = '';
+    mostrarErro(e.message);
+  }
+}
+
+function iconeSvgWrap(path){
+  return `<div class="icon-wrap">${iconeSvg(path)}</div>`;
+}
+
+// ---------------------------------------------------------------------
+// KPIs
+// ---------------------------------------------------------------------
+
+function linhaKpiIndisponivel(container, titulo){
+  document.getElementById(container).innerHTML = `<div class="kpi-row-top"><span>${titulo}</span></div><div class="kpi-indisponivel">Indicador ainda não disponível</div>`;
+}
+function linhaKpiValor(container, titulo, valor, sub){
+  document.getElementById(container).innerHTML = `<div class="kpi-row-top"><span>${titulo}</span><b>${valor}</b></div>${sub?`<div class="kpi-indisponivel">${sub}</div>`:''}`;
+}
+
+async function carregarKpis(){
+  esconderErro();
+  linhaKpiIndisponivel('kpi-pedidos-ativos', 'Pedidos ativos');
+  linhaKpiIndisponivel('kpi-pedidos-atrasados', 'Pedidos atrasados');
+  linhaKpiIndisponivel('kpi-pedidos-criticos', 'Pedidos críticos');
+  linhaKpiIndisponivel('kpi-itens-sem-cliente', 'Itens sem cliente');
+  linhaKpiIndisponivel('kpi-itens-sem-descricao', 'Itens sem descrição válida');
+
+  try{
+    const [resumo, clientesTop, honda, diversos] = await Promise.all([
+      apiGet('/api/admin/resumo'),
+      apiGet('/api/admin/clientes?por_pagina=100'),
+      apiGet('/api/admin/clientes?grupo=Honda&por_pagina=1'),
+      apiGet('/api/admin/clientes?grupo=Diversos&por_pagina=1'),
+    ]);
+
+    const top5 = [...clientesTop.itens].sort((a,b) => (b.total_cpds+b.total_arruelas) - (a.total_cpds+a.total_arruelas)).slice(0,5);
+    document.getElementById('kpi-itens-por-cliente').innerHTML = `<div class="kpi-row-top"><span>Itens por cliente (top 5)</span></div>` +
+      top5.map(c => `<div class="kpi-row"><div class="kpi-row-top"><span>${escapeHtml(c.nome)}</span><b>${c.total_cpds+c.total_arruelas}</b></div></div>`).join('');
+
+    document.getElementById('kpi-clientes-por-grupo').innerHTML = `<div class="kpi-row-top"><span>Clientes por grupo</span></div>
+      <div class="kpi-row"><div class="kpi-row-top"><span>Honda</span><b>${honda.paginacao.total_itens}</b></div></div>
+      <div class="kpi-row"><div class="kpi-row-top"><span>Diversos</span><b>${diversos.paginacao.total_itens}</b></div></div>`;
+
+    const tipos = Object.entries(resumo.pendencias_por_tipo || {});
+    document.getElementById('kpi-pendencias-por-tipo').innerHTML = tipos.length ? tipos.map(([tipo,total]) => `
+      <div class="kpi-row"><div class="kpi-row-top"><span>${TIPO_LABELS[tipo]||escapeHtml(tipo)}</span><b>${total}</b></div>
+      <div class="kpi-track"><div class="kpi-fill" style="width:${Math.min(100,total*4)}%"></div></div></div>
+    `).join('') : '<div class="kpi-indisponivel">Nenhuma pendência aberta.</div>';
+  }catch(e){
+    mostrarErro(e.message);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Navegação de abas com paginação (Itens / Clientes / Pendências)
+// ---------------------------------------------------------------------
+
+function renderPaginacao(aba, paginacao){
+  const el = document.getElementById('pag-'+aba);
+  if(!paginacao || paginacao.total_itens === 0){ el.innerHTML=''; return; }
+  el.innerHTML = `
+    <span>Página ${paginacao.pagina} de ${paginacao.total_paginas} (${paginacao.total_itens} itens)</span>
+    <button class="small" ${paginacao.pagina<=1?'disabled':''} onclick="mudarPagina('${aba}',${paginacao.pagina-1})">&larr; Anterior</button>
+    <button class="small" ${paginacao.pagina>=paginacao.total_paginas?'disabled':''} onclick="mudarPagina('${aba}',${paginacao.pagina+1})">Próxima &rarr;</button>
+  `;
+}
+function mudarPagina(aba, pagina){
+  ESTADO[aba].pagina = pagina;
+  carregarView(aba === 'itens' ? 'itens' : aba);
+}
+function recarregar(aba){
+  ESTADO[aba].pagina = 1;
+  carregarView(aba);
+}
+function tabela(id, linhas, montarLinha){
+  const tbody = document.getElementById('tbody-'+id);
+  const estado = document.getElementById('estado-'+id);
+  if(linhas.length === 0){
+    tbody.innerHTML = '';
+    estado.innerHTML = '<div class="empty">Nenhum registro encontrado.</div>';
+    return;
+  }
+  estado.innerHTML = '';
+  tbody.innerHTML = linhas.map(montarLinha).join('');
+}
+
+async function carregarItens(){
+  document.getElementById('tbody-itens').innerHTML = '';
+  document.getElementById('estado-itens').innerHTML = '<div class="loading">Carregando...</div>';
+  const params = {
+    busca: document.getElementById('item-busca').value.trim(),
+    tipo: document.getElementById('item-tipo').value,
+    cliente: document.getElementById('item-cliente').value.trim(),
+    grupo: document.getElementById('item-grupo').value.trim(),
+    ativo: document.getElementById('item-ativo').value,
+    possui_pendencia: document.getElementById('item-pendencia').value,
+    pagina: ESTADO.itens.pagina, por_pagina: ESTADO.itens.porPagina,
+  };
+  try{
+    const dados = await apiGet('/api/admin/itens?' + montarQuery(params));
+    esconderErro();
+    tabela('itens', dados.itens, (i) => `
+      <tr onclick="${i.tipo==='CPD'?`abrirDetalheCpd(${i.id})`:`abrirDetalheArruela(${i.id})`}">
+        <td class="mono">${escapeHtml(i.codigo)}</td>
+        <td><span class="badge ${i.tipo==='CPD'?'b-tipo-cpd':'b-tipo-arruela'}">${i.tipo}</span></td>
+        <td>${escapeHtml(i.descricao || '-')}</td>
+        <td>${i.clientes.map(escapeHtml).join(', ') || '-'}</td>
+        <td>${i.grupos.map(g => `<span class="badge b-grupo">${escapeHtml(g)}</span>`).join(' ') || '-'}</td>
+        <td>${i.total_pendencias>0?`<span class="badge b-pendente">${i.total_pendencias}</span>`:'-'}</td>
+        <td><span class="badge ${i.ativo?'b-ok':'b-off'}">${i.ativo?'Ativo':'Inativo'}</span></td>
+      </tr>`);
+    renderPaginacao('itens', dados.paginacao);
+  }catch(e){
+    document.getElementById('estado-itens').innerHTML = '';
+    mostrarErro(e.message);
+  }
+}
+
+async function carregarClientes(){
+  document.getElementById('tbody-clientes').innerHTML = '';
+  document.getElementById('estado-clientes').innerHTML = '<div class="loading">Carregando...</div>';
+  const params = {
+    busca: document.getElementById('cli-busca').value.trim(),
+    grupo: document.getElementById('cli-grupo').value.trim(),
+    ativo: document.getElementById('cli-ativo').value,
+    pagina: ESTADO.clientes.pagina, por_pagina: ESTADO.clientes.porPagina,
+  };
+  try{
+    const dados = await apiGet('/api/admin/clientes?' + montarQuery(params));
+    esconderErro();
+    tabela('clientes', dados.itens, (cli) => `
+      <tr tabindex="0" role="button" onclick="abrirDetalheCliente(${cli.id})" onkeydown="ativarComTeclado(event, () => abrirDetalheCliente(${cli.id}))">
+        <td>${escapeHtml(cli.nome)}${cli.aliases.length?`<div style="font-size:11px;color:var(--text3);margin-top:2px;">${cli.aliases.map(escapeHtml).join(', ')}</div>`:''}</td>
+        <td>${cli.grupos.map(g => `<span class="badge b-grupo">${escapeHtml(g)}</span>`).join(' ') || '<span class="badge">-</span>'}</td>
+        <td>${cli.total_cpds + cli.total_arruelas}</td>
+        <td>${cli.total_pedidos}</td>
+        <td><span class="badge ${cli.ativo?'b-ok':'b-off'}">${cli.ativo?'Ativo':'Inativo'}</span></td>
+      </tr>`);
+    renderPaginacao('clientes', dados.paginacao);
+  }catch(e){
+    document.getElementById('estado-clientes').innerHTML = '';
+    mostrarErro(e.message);
+  }
+}
+
+const TIPO_LABELS = {
+  ZERO_ESQUERDA:'Zero à esquerda', CONFLITO_DESCRICAO:'Conflito de descrição',
+  DUPLICIDADE_LISTA:'Duplicidade na lista', PAI_AUSENTE:'Pai ausente',
+  CLIENTE_INDEFINIDO:'Cliente indefinido', FORMATO_AMBIGUO:'Formato ambíguo', CODIGO_INVALIDO:'Código inválido',
+};
+const STATUS_BADGE = {PENDENTE:'b-pendente', RESOLVIDO:'b-resolvido', IGNORADO:'b-ignorado'};
+
+async function carregarPendencias(){
+  document.getElementById('tbody-pendencias').innerHTML = '';
+  document.getElementById('estado-pendencias').innerHTML = '<div class="loading">Carregando...</div>';
+  const params = {
+    codigo: document.getElementById('pen-codigo').value.trim(),
+    tipo: document.getElementById('pen-tipo').value,
+    status: document.getElementById('pen-status').value,
+    pagina: ESTADO.pendencias.pagina, por_pagina: ESTADO.pendencias.porPagina,
+  };
+  try{
+    const dados = await apiGet('/api/admin/pendencias?' + montarQuery(params));
+    esconderErro();
+    tabela('pendencias', dados.itens, (p) => `
+      <tr onclick="abrirDetalhePendencia(${p.id})">
+        <td>${TIPO_LABELS[p.tipo] || escapeHtml(p.tipo)}</td>
+        <td class="mono">${escapeHtml(p.codigo_completo)}</td>
+        <td>${escapeHtml((p.detalhes && p.detalhes.motivo) || '-')}</td>
+        <td>CPD</td>
+        <td><span class="badge ${STATUS_BADGE[p.status]||''}">${escapeHtml(p.status)}</span></td>
+        <td>${escapeHtml(p.criado_em || '-')}</td>
+        <td><button class="small" onclick="event.stopPropagation();abrirDetalhePendencia(${p.id})">Visualizar</button></td>
+      </tr>`);
+    renderPaginacao('pendencias', dados.paginacao);
+  }catch(e){
+    document.getElementById('estado-pendencias').innerHTML = '';
+    mostrarErro(e.message);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Painel de detalhes
+// ---------------------------------------------------------------------
+
+function ativarComTeclado(event, acao){
+  if(event.key === 'Enter' || event.key === ' '){
+    event.preventDefault();
+    acao();
+  }
+}
+let elementoAntesDoPainel = null;
+function abrirPainel(html){
+  elementoAntesDoPainel = document.activeElement;
+  document.getElementById('painel-conteudo').innerHTML = html;
+  document.getElementById('panel-overlay').classList.add('open');
+  document.querySelector('.panel-close').focus();
+}
+function fecharPainel(){
+  document.getElementById('panel-overlay').classList.remove('open');
+  if(elementoAntesDoPainel && elementoAntesDoPainel.focus) elementoAntesDoPainel.focus();
+}
+document.addEventListener('keydown', (e) => { if(e.key === 'Escape') fecharPainel(); });
+
+async function abrirDetalheCliente(id){
+  try{
+    const c = await apiGet(`/api/admin/clientes/${id}`);
+    abrirPainel(`
+      <h2>${escapeHtml(c.nome)}</h2>
+      <div class="panel-sub">Cliente #${c.id} &middot; ${c.ativo?'Ativo':'Inativo'}</div>
+      <div class="panel-section"><h4>Grupos</h4><div class="chip-list">${c.grupos.map(g=>`<span class="badge b-grupo">${escapeHtml(g)}</span>`).join('') || '<span class="badge">-</span>'}</div></div>
+      <div class="panel-section"><h4>Aliases</h4><div class="chip-list">${c.aliases.map(escapeHtml).map(a=>`<span class="badge">${a}</span>`).join('') || '<span class="badge">Nenhum</span>'}</div></div>
+      <div class="panel-section"><h4>CPDs vinculados (${c.cpds.length})</h4>${c.cpds.map(cp=>`<div class="panel-row"><span class="mono">${escapeHtml(cp.codigo)}</span><span>${escapeHtml(cp.descricao_padrao||'-')}</span></div>`).join('') || '<div class="empty">Nenhum</div>'}</div>
+      <div class="panel-section"><h4>Arruelas vinculadas (${c.arruelas.length})</h4>${c.arruelas.map(a=>`<div class="panel-row"><span class="mono">${escapeHtml(a.codigo)}</span><span>${escapeHtml(a.descricao_padrao||'-')}</span></div>`).join('') || '<div class="empty">Nenhuma</div>'}</div>
+      <div class="panel-section"><h4>Rastreabilidade</h4>
+        <div class="panel-row"><span>Pedidos relacionados</span><span>${c.total_pedidos}</span></div>
+        <div class="panel-row"><span>Criado em</span><span>${escapeHtml(c.criado_em||'-')}</span></div>
+        <div class="panel-row"><span>Atualizado em</span><span>${escapeHtml(c.atualizado_em||'-')}</span></div>
+      </div>
+    `);
+  }catch(e){ mostrarErro(e.message); }
+}
+
+async function abrirDetalheCpd(id){
+  try{
+    const cp = await apiGet(`/api/admin/cpds/${id}`);
+    abrirPainel(`
+      <h2 class="mono">${escapeHtml(cp.codigo)}</h2>
+      <div class="panel-sub">CPD #${cp.id} &middot; ${cp.ativo?'Ativo':'Inativo'} &middot; código de 5 dígitos</div>
+      <div class="panel-section"><h4>Descrição canônica</h4><div>${escapeHtml(cp.descricao_canonica || '-')}</div></div>
+      <div class="panel-section"><h4>Códigos originais históricos</h4><div class="chip-list">${cp.codigos_originais_historicos.map(c=>`<span class="badge mono">${escapeHtml(c)}</span>`).join('') || '<span class="badge">Nenhum</span>'}</div></div>
+      <div class="panel-section"><h4>Descrições-fontes</h4>${cp.descricoes_fontes.map(d=>`<div class="panel-row"><span>${escapeHtml(d.fonte)} (${escapeHtml(d.codigo_completo)})${d.descricao_canonica?' &middot; canônica':''}</span><span>${escapeHtml(d.descricao||'-')}</span></div>`).join('') || '<div class="empty">Nenhuma</div>'}</div>
+      <div class="panel-section"><h4>Clientes</h4><div class="chip-list">${cp.clientes.map(escapeHtml).map(c=>`<span class="badge">${c}</span>`).join('') || '<span class="badge">Nenhum</span>'}</div></div>
+      <div class="panel-section"><h4>Grupos</h4><div class="chip-list">${cp.grupos.map(g=>`<span class="badge b-grupo">${escapeHtml(g)}</span>`).join('') || '<span class="badge">-</span>'}</div></div>
+      <div class="panel-section"><h4>Pendências (${cp.pendencias.length})</h4>${cp.pendencias.map(p=>`<div class="panel-row"><span>${TIPO_LABELS[p.tipo]||escapeHtml(p.tipo)}</span><span class="badge ${STATUS_BADGE[p.status]||''}">${escapeHtml(p.status)}</span></div>`).join('') || '<div class="empty">Nenhuma</div>'}</div>
+    `);
+  }catch(e){ mostrarErro(e.message); }
+}
+
+async function abrirDetalheArruela(id){
+  try{
+    const a = await apiGet(`/api/admin/arruelas/${id}`);
+    abrirPainel(`
+      <h2 class="mono">${escapeHtml(a.codigo)}</h2>
+      <div class="panel-sub">Arruela #${a.id} &middot; ${a.ativo?'Ativa':'Inativa'} &middot; categoria separada de CPDs</div>
+      <div class="panel-section"><h4>Descrição padrão</h4><div>${escapeHtml(a.descricao_padrao || '-')}</div></div>
+      <div class="panel-section"><h4>Outras descrições encontradas</h4>${a.descricoes_fontes.map(d=>`<div class="panel-row"><span>${escapeHtml(d.fonte)}${d.descricao_canonica?' (canônica)':''}</span><span>${escapeHtml(d.descricao||'-')}</span></div>`).join('') || '<div class="empty">Nenhuma</div>'}</div>
+      <div class="panel-section"><h4>Clientes</h4><div class="chip-list">${a.clientes.map(escapeHtml).map(c=>`<span class="badge">${c}</span>`).join('') || '<span class="badge">Nenhum</span>'}</div></div>
+      <div class="panel-section"><h4>Grupos</h4><div class="chip-list">${a.grupos.map(g=>`<span class="badge b-grupo">${escapeHtml(g)}</span>`).join('') || '<span class="badge">-</span>'}</div></div>
+    `);
+  }catch(e){ mostrarErro(e.message); }
+}
+
+async function abrirDetalhePendencia(id){
+  try{
+    const p = await apiGet(`/api/admin/pendencias/${id}`);
+    abrirPainel(`
+      <h2>${TIPO_LABELS[p.tipo] || escapeHtml(p.tipo)}</h2>
+      <div class="panel-sub">Pendência #${p.id} &middot; <span class="badge ${STATUS_BADGE[p.status]||''}">${escapeHtml(p.status)}</span></div>
+      <div class="panel-section"><h4>Código</h4><div class="mono">${escapeHtml(p.codigo_completo)}</div></div>
+      <div class="panel-section"><h4>CPD relacionado</h4><div>${escapeHtml(p.cpd_codigo_pai || '-')}</div></div>
+      <div class="panel-section"><h4>Nível de confiança</h4><div>${escapeHtml(p.nivel_confianca || '-')}</div></div>
+      <div class="panel-section"><h4>Detalhes</h4><pre style="white-space:pre-wrap;font-size:11.5px;background:var(--bg-elevated-2);padding:8px;border-radius:6px;">${escapeHtml(JSON.stringify(p.detalhes || {}, null, 2))}</pre></div>
+      <div class="panel-section">
+        <div class="panel-row"><span>Criado em</span><span>${escapeHtml(p.criado_em||'-')}</span></div>
+        <div class="panel-row"><span>Resolvido em</span><span>${escapeHtml(p.resolvido_em||'-')}</span></div>
+      </div>
+    `);
+  }catch(e){ mostrarErro(e.message); }
+}
+
+// ---------------------------------------------------------------------
+// Inicialização
+// ---------------------------------------------------------------------
+
+function viewValida(v){
+  return ['geral','kpis','itens','clientes','pendencias','cadastros','configuracoes'].includes(v);
+}
+function inicializar(){
+  const hash = window.location.hash.replace('#','');
+  const viewInicial = viewValida(hash) ? hash : 'geral';
+  irPara(viewInicial);
+  carregarResumoParaBadge();
+}
+window.addEventListener('hashchange', () => {
+  const hash = window.location.hash.replace('#','');
+  if(viewValida(hash) && hash !== viewAtual) irPara(hash);
+});
+
+inicializar();
+</script>
+</body>
+</html>

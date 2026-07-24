@@ -235,5 +235,54 @@ class AnaliseListaOficialTestCase(unittest.TestCase):
         self.assertTrue(all(v == 0 for v in depois.values()))
 
 
+class ClassificarParDescricoesTestCase(unittest.TestCase):
+    """Regra oficial: quando duas descrições são tecnicamente equivalentes e
+    a única diferença é o prefixo inicial "PARAF"/"PARAF."/"PARAFUSO", isso é
+    categoria B (convenção de descrição, não informação técnica) -- nunca
+    remove o prefixo se não estiver no início, nunca remove parte de outra
+    palavra, e qualquer diferença técnica real (dimensão/material/classe/
+    tratamento/acabamento/norma) continua virando categoria C ou D."""
+
+    def test_paraf_sem_ponto_e_removido(self):
+        categoria, _ = analisador.classificar_par_descricoes("PARAF TESTE 4X10 ZNA", "TESTE 4X10 ZNA")
+        self.assertEqual(categoria, "B")
+
+    def test_paraf_com_ponto_e_removido(self):
+        categoria, _ = analisador.classificar_par_descricoes("PARAF. TESTE 4X10 ZNA", "TESTE 4X10 ZNA")
+        self.assertEqual(categoria, "B")
+
+    def test_parafuso_e_removido(self):
+        categoria, _ = analisador.classificar_par_descricoes("PARAFUSO TESTE 4X10 ZNA", "TESTE 4X10 ZNA")
+        self.assertEqual(categoria, "B")
+
+    def test_descricao_ja_sem_prefixo_permanece_igual(self):
+        # Nenhuma das duas tem prefixo -- se o resto for idêntico, categoria A.
+        categoria, _ = analisador.classificar_par_descricoes("TESTE 4X10 ZNA", "TESTE 4X10 ZNA")
+        self.assertEqual(categoria, "A")
+        self.assertEqual(analisador._remover_prefixo_paraf(analisador._normalizar_cosmetico("TESTE 4X10 ZNA")), "TESTE 4X10 ZNA")
+
+    def test_palavra_com_paraf_no_meio_nao_e_alterada(self):
+        # "SUPARAFUSO" não é o prefixo oficial (não está exatamente no
+        # início como token próprio) -- não deve virar categoria B só por
+        # conter as letras "PARAF".
+        normalizada = analisador._normalizar_cosmetico("SUPARAFUSO TESTE 4X10")
+        self.assertEqual(analisador._remover_prefixo_paraf(normalizada), "SUPARAFUSO TESTE 4X10")
+
+    def test_prefixo_paraf_no_meio_da_frase_nao_e_removido(self):
+        # O prefixo só é removido se estiver no INÍCIO da descrição -- uma
+        # ocorrência de "PARAF" no meio da frase (dentro de outra palavra)
+        # tem que sobreviver à normalização.
+        normalizada = analisador._normalizar_cosmetico("TESTE COMPARAFUSADO 4X10")
+        self.assertEqual(analisador._remover_prefixo_paraf(normalizada), "TESTE COMPARAFUSADO 4X10")
+
+    def test_diferenca_de_dimensao_gera_conflito(self):
+        categoria, _ = analisador.classificar_par_descricoes("PARAF TESTE 4X10 ZNA", "TESTE 4X12 ZNA")
+        self.assertIn(categoria, ("C", "D"))
+
+    def test_diferenca_de_acabamento_gera_conflito(self):
+        categoria, _ = analisador.classificar_par_descricoes("PARAF TESTE 4X10 ZNA TRIV", "TESTE 4X10 ZNA NYLON")
+        self.assertIn(categoria, ("C", "D"))
+
+
 if __name__ == "__main__":
     unittest.main()

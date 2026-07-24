@@ -39,3 +39,7 @@ importacao/
 # é versionado.
 config_local/*.json
 !config_local/*.example.json
+
+# Referências visuais externas (imagens de layout, mockups) -- só uso local
+# de design, nunca versionadas.
+referencias/
