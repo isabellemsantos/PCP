@@ -43,3 +43,9 @@ config_local/*.json
 # Referências visuais externas (imagens de layout, mockups) -- só uso local
 # de design, nunca versionadas.
 referencias/
+
+# Material de referência visual de frontend (imagens, HTML/CSS, exportação
+# Figma, DESIGN.md, especificação de interações, de qualquer ferramenta ou
+# fonte) -- referência local para reconstruir/evoluir o front-end depois,
+# nunca versionado.
+referencias_frontend/

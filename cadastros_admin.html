@@ -407,6 +407,25 @@
 </div>
 
 <script>
+// =========================================================================
+// Interface PROVISÓRIA -- ver docs/guia_integracao_frontend.md.
+// Este HTML/CSS será substituído por um design final; a lógica abaixo está
+// organizada em camadas para que a substituição não exija tocar em
+// servidor_pcp.py nem nas regras de negócio:
+//   1) Estado da aplicação (ESTADO, TITULOS, viewAtual) -- dados de sessão
+//      de navegação, sem qualquer referência a HTML/CSS.
+//   2) Camada de acesso à API (objeto Api, mais abaixo) -- único ponto que
+//      conhece as rotas /api/admin/*. Contrato completo documentado em
+//      docs/contrato_interface_pcp.md.
+//   3) Render (funções puras de formatação -- escapeHtml, TIPO_LABELS,
+//      STATUS_BADGE, ícones) -- não sabem nada de estado nem de rede.
+//   4) Controladores de view (carregarX) -- leem ESTADO + filtros do DOM,
+//      chamam Api.*, passam o resultado pro Render, atualizam o DOM.
+// Nenhum desses controladores deve ser tratado como definitivo: posição de
+// elementos, cores, ícones, menu e quantidade de cards são só provisórios.
+// =========================================================================
+
+// ---- 1) Estado da aplicação ----
 const ESTADO = {
   itens: {pagina:1, porPagina:25},
   clientes: {pagina:1, porPagina:25},
@@ -475,6 +494,7 @@ function esconderErro(){
   document.getElementById('erro-global').classList.add('hidden');
 }
 
+// ---- 2) Camada de acesso à API ----
 async function apiGet(url){
   const resp = await fetch(url, {cache:'no-store'});
   let dados = null;
@@ -492,6 +512,26 @@ function montarQuery(params){
   Object.entries(params).forEach(([k,v]) => { if(v !== '' && v !== null && v !== undefined) usp.set(k, v); });
   return usp.toString();
 }
+
+// -----------------------------------------------------------------------
+// Camada de acesso à API -- único lugar que conhece as rotas /api/admin/*.
+// Views/controladores nunca montam URL direto; um design final novo pode
+// reaproveitar esta camada sem tocar em servidor_pcp.py. Contrato
+// completo em docs/contrato_interface_pcp.md.
+// -----------------------------------------------------------------------
+const Api = {
+  resumo: () => apiGet('/api/admin/resumo'),
+  clientes: (params = {}) => apiGet('/api/admin/clientes?' + montarQuery(params)),
+  clienteDetalhe: (id) => apiGet(`/api/admin/clientes/${id}`),
+  cpds: (params = {}) => apiGet('/api/admin/cpds?' + montarQuery(params)),
+  cpdDetalhe: (id) => apiGet(`/api/admin/cpds/${id}`),
+  arruelas: (params = {}) => apiGet('/api/admin/arruelas?' + montarQuery(params)),
+  arruelaDetalhe: (id) => apiGet(`/api/admin/arruelas/${id}`),
+  itens: (params = {}) => apiGet('/api/admin/itens?' + montarQuery(params)),
+  pendencias: (params = {}) => apiGet('/api/admin/pendencias?' + montarQuery(params)),
+  pendenciaDetalhe: (id) => apiGet(`/api/admin/pendencias/${id}`),
+};
+// ---- 3) Render (funções puras -- sem estado, sem rede) ----
 function escapeHtml(valor){
   if(valor === null || valor === undefined) return '';
   return String(valor).replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -505,9 +545,10 @@ const ICONE_CPD = '<path d="M4 4h16v16H4z"/><path d="M8 4v16"/>';
 const ICONE_ARRUELA = '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>';
 const ICONE_ALERTA = '<path d="M12 3l9 16H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>';
 
+// ---- 4) Controladores de view (leem ESTADO+DOM, chamam Api, chamam Render) ----
 async function carregarResumoParaBadge(){
   try{
-    const dados = await apiGet('/api/admin/resumo');
+    const dados = await Api.resumo();
     document.getElementById('badge-pendencias').textContent = dados.total_pendencias_abertas;
     return dados;
   }catch(e){
@@ -522,7 +563,7 @@ async function carregarResumoParaBadge(){
 
 async function carregarVisaoGeral(){
   try{
-    const dados = await apiGet('/api/admin/resumo');
+    const dados = await Api.resumo();
     esconderErro();
     document.getElementById('badge-pendencias').textContent = dados.total_pendencias_abertas;
     document.getElementById('cards-geral').innerHTML = `
@@ -563,14 +604,14 @@ async function carregarConsultaRapida(){
   try{
     if(ESTADO.quick.tipo === 'itens'){
       thead.innerHTML = '<tr><th>Código</th><th>Tipo</th><th>Cliente(s)</th><th>Status</th></tr>';
-      const dados = await apiGet('/api/admin/itens?' + montarQuery({busca, grupo, por_pagina:8}));
+      const dados = await Api.itens({busca, grupo, por_pagina:8});
       esconderErro();
       if(dados.itens.length === 0){ tbody.innerHTML=''; estado.innerHTML = '<div class="empty">Nenhum item encontrado.</div>'; return; }
       estado.innerHTML = '';
       tbody.innerHTML = dados.itens.map(i => `<tr><td class="mono">${escapeHtml(i.codigo)}</td><td><span class="badge ${i.tipo==='CPD'?'b-tipo-cpd':'b-tipo-arruela'}">${i.tipo}</span></td><td>${i.clientes.map(escapeHtml).join(', ')||'-'}</td><td><span class="badge ${i.ativo?'b-ok':'b-off'}">${i.ativo?'Ativo':'Inativo'}</span></td></tr>`).join('');
     } else {
       thead.innerHTML = '<tr><th>Cliente</th><th>Grupo</th><th>Itens vinculados</th><th>Status</th></tr>';
-      const dados = await apiGet('/api/admin/clientes?' + montarQuery({busca, grupo, por_pagina:8}));
+      const dados = await Api.clientes({busca, grupo, por_pagina:8});
       esconderErro();
       if(dados.itens.length === 0){ tbody.innerHTML=''; estado.innerHTML = '<div class="empty">Nenhum cliente encontrado.</div>'; return; }
       estado.innerHTML = '';
@@ -585,7 +626,7 @@ async function carregarConsultaRapida(){
 async function carregarPendenciasRecentes(){
   const el = document.getElementById('pendencias-recentes');
   try{
-    const dados = await apiGet('/api/admin/pendencias?por_pagina=5');
+    const dados = await Api.pendencias({por_pagina:5});
     if(dados.itens.length === 0){ el.innerHTML = '<div class="empty">Nenhuma pendência registrada.</div>'; return; }
     el.innerHTML = `<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Código</th><th>Status</th><th>Data</th></tr></thead><tbody>` +
       dados.itens.map(p => `<tr onclick="abrirDetalhePendencia(${p.id})"><td>${TIPO_LABELS[p.tipo]||escapeHtml(p.tipo)}</td><td class="mono">${escapeHtml(p.codigo_completo)}</td><td><span class="badge ${STATUS_BADGE[p.status]||''}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.criado_em||'-')}</td></tr>`).join('') +
@@ -621,10 +662,10 @@ async function carregarKpis(){
 
   try{
     const [resumo, clientesTop, honda, diversos] = await Promise.all([
-      apiGet('/api/admin/resumo'),
-      apiGet('/api/admin/clientes?por_pagina=100'),
-      apiGet('/api/admin/clientes?grupo=Honda&por_pagina=1'),
-      apiGet('/api/admin/clientes?grupo=Diversos&por_pagina=1'),
+      Api.resumo(),
+      Api.clientes({por_pagina:100}),
+      Api.clientes({grupo:'Honda', por_pagina:1}),
+      Api.clientes({grupo:'Diversos', por_pagina:1}),
     ]);
 
     const top5 = [...clientesTop.itens].sort((a,b) => (b.total_cpds+b.total_arruelas) - (a.total_cpds+a.total_arruelas)).slice(0,5);
@@ -691,7 +732,7 @@ async function carregarItens(){
     pagina: ESTADO.itens.pagina, por_pagina: ESTADO.itens.porPagina,
   };
   try{
-    const dados = await apiGet('/api/admin/itens?' + montarQuery(params));
+    const dados = await Api.itens(params);
     esconderErro();
     tabela('itens', dados.itens, (i) => `
       <tr onclick="${i.tipo==='CPD'?`abrirDetalheCpd(${i.id})`:`abrirDetalheArruela(${i.id})`}">
@@ -720,7 +761,7 @@ async function carregarClientes(){
     pagina: ESTADO.clientes.pagina, por_pagina: ESTADO.clientes.porPagina,
   };
   try{
-    const dados = await apiGet('/api/admin/clientes?' + montarQuery(params));
+    const dados = await Api.clientes(params);
     esconderErro();
     tabela('clientes', dados.itens, (cli) => `
       <tr tabindex="0" role="button" onclick="abrirDetalheCliente(${cli.id})" onkeydown="ativarComTeclado(event, () => abrirDetalheCliente(${cli.id}))">
@@ -754,7 +795,7 @@ async function carregarPendencias(){
     pagina: ESTADO.pendencias.pagina, por_pagina: ESTADO.pendencias.porPagina,
   };
   try{
-    const dados = await apiGet('/api/admin/pendencias?' + montarQuery(params));
+    const dados = await Api.pendencias(params);
     esconderErro();
     tabela('pendencias', dados.itens, (p) => `
       <tr onclick="abrirDetalhePendencia(${p.id})">
@@ -798,7 +839,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') fecharPaine
 
 async function abrirDetalheCliente(id){
   try{
-    const c = await apiGet(`/api/admin/clientes/${id}`);
+    const c = await Api.clienteDetalhe(id);
     abrirPainel(`
       <h2>${escapeHtml(c.nome)}</h2>
       <div class="panel-sub">Cliente #${c.id} &middot; ${c.ativo?'Ativo':'Inativo'}</div>
@@ -817,7 +858,7 @@ async function abrirDetalheCliente(id){
 
 async function abrirDetalheCpd(id){
   try{
-    const cp = await apiGet(`/api/admin/cpds/${id}`);
+    const cp = await Api.cpdDetalhe(id);
     abrirPainel(`
       <h2 class="mono">${escapeHtml(cp.codigo)}</h2>
       <div class="panel-sub">CPD #${cp.id} &middot; ${cp.ativo?'Ativo':'Inativo'} &middot; código de 5 dígitos</div>
@@ -833,7 +874,7 @@ async function abrirDetalheCpd(id){
 
 async function abrirDetalheArruela(id){
   try{
-    const a = await apiGet(`/api/admin/arruelas/${id}`);
+    const a = await Api.arruelaDetalhe(id);
     abrirPainel(`
       <h2 class="mono">${escapeHtml(a.codigo)}</h2>
       <div class="panel-sub">Arruela #${a.id} &middot; ${a.ativo?'Ativa':'Inativa'} &middot; categoria separada de CPDs</div>
@@ -847,7 +888,7 @@ async function abrirDetalheArruela(id){
 
 async function abrirDetalhePendencia(id){
   try{
-    const p = await apiGet(`/api/admin/pendencias/${id}`);
+    const p = await Api.pendenciaDetalhe(id);
     abrirPainel(`
       <h2>${TIPO_LABELS[p.tipo] || escapeHtml(p.tipo)}</h2>
       <div class="panel-sub">Pendência #${p.id} &middot; <span class="badge ${STATUS_BADGE[p.status]||''}">${escapeHtml(p.status)}</span></div>
