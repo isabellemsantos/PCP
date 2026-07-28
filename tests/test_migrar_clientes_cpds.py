@@ -93,6 +93,17 @@ def _criar_planilha(caminho: Path) -> None:
     ws.append(["88771/1/2", "Peça barra invalida", "FICTICIO_INVALIDO"])  # continua CODIGO_INVALIDO
     ws.append(["ZZ-090", "Arruela lisa ZZ090", "FICTICIO_ARRUELA"])  # ARRUELA, não CPD
     ws.append(["YY-081", "Arruela lisa YY081", "FICTICIO_ARRUELA"])  # ARRUELA, não CPD
+    # Regra oficial PARAF/PARAFUSO: lista oficial COM prefixo, manual_cpd SEM
+    # -- a canônica tem que ser a versão sem prefixo, mesmo vindo de
+    # manual_cpd (não de lista oficial, que é a prioridade padrão).
+    ws.append(["50001", "PARAF TESTE QUATRO 5X15 ZNA", "FICTICIO_PARAF"])
+    # Regra de colapso + PARAF juntas: o código-base "50002" e a extensão
+    # histórica "50002.1" decidem suas canônicas de forma independente (cada
+    # um só tem 1 fonte), mas pertencem ao MESMO CPD -- só uma pode
+    # sobreviver como canônica depois do colapso, e tem que ser a versão sem
+    # o prefixo PARAF (mesmo estando na extensão, não no código-base).
+    ws.append(["50002", "PARAF TESTE CINCO 6X20 ZNA", "FICTICIO_PARAF"])
+    ws.append(["50002.1", "TESTE CINCO 6X20 ZNA", "FICTICIO_PARAF"])
     wb.save(caminho)
 
 
@@ -134,6 +145,10 @@ class MigrarClientesCpdsTestCase(unittest.TestCase):
             conn.execute(
                 "INSERT INTO manual_cpd(codigo, descricao, updated_at) VALUES ('08003',?,?)",
                 (f"PARAF {_DESC_LONGA_ALTA}", agora),
+            )
+            conn.execute(
+                "INSERT INTO manual_cpd(codigo, descricao, updated_at) VALUES ('50001','TESTE QUATRO 5X15 ZNA',?)",
+                (agora,),
             )
 
             def _pedido(order_id, cliente, cpd, descricao="", deleted=False):
@@ -294,6 +309,44 @@ class MigrarClientesCpdsTestCase(unittest.TestCase):
         origens = {f["fonte"] for f in fontes}
         self.assertIn("LISTA_OFICIAL", origens)
         self.assertIn("PEDIDO", origens)
+
+    def test_descricao_canonica_prefere_versao_sem_prefixo_paraf(self):
+        # Lista oficial diz "PARAF TESTE QUATRO 5X15 ZNA", manual_cpd diz
+        # "TESTE QUATRO 5X15 ZNA" (mesma peça, só sem o prefixo) -- a
+        # canônica tem que ser a versão SEM prefixo, mesmo vindo de
+        # manual_cpd (não da lista oficial, que é a prioridade padrão nos
+        # outros casos).
+        fontes = [d for d in self.plano["descricoes_fontes"] if d["codigo_completo"] == "50001"]
+        canonica = next(d for d in fontes if d["descricao_canonica"] == 1)
+        self.assertEqual(canonica["descricao"], "TESTE QUATRO 5X15 ZNA")
+        self.assertEqual(canonica["fonte"], "MANUAL_CPD")
+
+    def test_todas_as_fontes_paraf_permanecem_preservadas(self):
+        fontes = [d for d in self.plano["descricoes_fontes"] if d["codigo_completo"] == "50001"]
+        descricoes = {d["descricao"] for d in fontes}
+        self.assertEqual(descricoes, {"PARAF TESTE QUATRO 5X15 ZNA", "TESTE QUATRO 5X15 ZNA"})
+        origens = {d["fonte"] for d in fontes}
+        self.assertEqual(origens, {"LISTA_OFICIAL", "MANUAL_CPD"})
+
+    def test_canonica_consolidada_por_cpd_base_mesmo_com_extensao_conflitante(self):
+        # "50002" e "50002.1" decidem canônica cada um isoladamente (só 1
+        # fonte cada), mas colapsam no mesmo CPD-base "50002" -- só uma pode
+        # sobrar como canônica, e tem que ser a versão sem prefixo PARAF
+        # (que está na extensão "50002.1", não no código-base).
+        fontes = [d for d in self.plano["descricoes_fontes"] if d["codigo_completo"] in ("50002", "50002.1")]
+        canonicas = [d for d in fontes if d["descricao_canonica"] == 1]
+        self.assertEqual(len(canonicas), 1, f"esperado exatamente 1 canônica entre os códigos históricos do mesmo CPD-base, achou {len(canonicas)}: {canonicas}")
+        self.assertEqual(canonicas[0]["descricao"], "TESTE CINCO 6X20 ZNA")
+        self.assertEqual(canonicas[0]["codigo_completo"], "50002.1")
+
+    def test_nenhum_codigo_historico_e_perdido_apos_consolidacao(self):
+        fontes = [d for d in self.plano["descricoes_fontes"] if d["codigo_completo"] in ("50002", "50002.1")]
+        self.assertEqual({d["codigo_completo"] for d in fontes}, {"50002", "50002.1"})
+
+    def test_regra_paraf_nao_altera_manual_cpd_nem_pedidos(self):
+        with sqlite3.connect(str(self.db_base)) as c:
+            desc_manual = c.execute("SELECT descricao FROM manual_cpd WHERE codigo='50001'").fetchone()[0]
+        self.assertEqual(desc_manual, "TESTE QUATRO 5X15 ZNA", "manual_cpd não pode ser reescrito pela migração")
 
     def test_extensao_preserva_zeros_a_esquerda(self):
         # "8001.1" -> pai "08001", extensão "1" (texto, nunca vira número).
@@ -659,6 +712,14 @@ class MigrarClientesCpdsTestCase(unittest.TestCase):
         self.assertNotIn("YY-081", codigos_pai)
         self.assertNotIn("ZZ-090", codigos_variacao)
         self.assertNotIn("YY-081", codigos_variacao)
+
+        with sqlite3.connect(str(db)) as c:
+            desc_padrao = c.execute("SELECT descricao_padrao FROM cpds WHERE codigo_pai='50002'").fetchone()[0]
+        self.assertEqual(
+            desc_padrao, "TESTE CINCO 6X20 ZNA",
+            "cpds.descricao_padrao tem que ser a versão sem prefixo PARAF, consolidada por CPD-base "
+            "mesmo vindo da extensão histórica '50002.1' -- nunca None nem a versão com prefixo.",
+        )
 
     def test_segunda_aplicacao_em_cima_da_primeira_nao_duplica_clientes(self):
         # A migração de clientes/CPDs em si (diferente das migrações de

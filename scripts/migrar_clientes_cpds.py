@@ -237,6 +237,30 @@ def _normalizar_codigo_de_fonte(codigo_bruto, numerico: bool = False) -> dict:
     return resultado_cpd
 
 
+def _indice_canonico_sem_prefixo_paraf(candidatas: list[dict]) -> int | None:
+    """Regra oficial: quando descrições são tecnicamente equivalentes e a
+    única diferença é o prefixo inicial "PARAF"/"PARAF."/"PARAFUSO", a
+    descrição canônica é sempre a versão SEM esse prefixo -- não importa de
+    qual fonte ela veio (lista oficial, manual_cpd ou pedido).
+
+    Só decide quando TODAS as descrições distintas em `candidatas`, depois de
+    normalizadas e com o prefixo removido, coincidem (ou seja, não há
+    nenhuma diferença técnica real -- dimensão/material/classe/tratamento/
+    acabamento/norma continuam sendo tratados como conflito de verdade,
+    nunca decididos aqui). Devolve None nesses casos, ou se nenhuma
+    candidata estiver de fato sem o prefixo -- quem chama cai de volta na
+    prioridade padrão (lista oficial).
+    """
+    normalizadas = [lista_oficial._normalizar_cosmetico(c["descricao"]) for c in candidatas]
+    sem_prefixo = {lista_oficial._remover_prefixo_paraf(n) for n in normalizadas}
+    if len(sem_prefixo) != 1:
+        return None
+    for i, normalizada in enumerate(normalizadas):
+        if not lista_oficial._PREFIXO_PARAF_RE.match(normalizada):
+            return i
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Construção do plano (só leitura, nenhuma escrita)
 # ---------------------------------------------------------------------------
@@ -462,10 +486,12 @@ def construir_plano(conn_leitura: sqlite3.Connection, caminho_planilha: Path, co
         canonica_idx = None
 
         if conflito:
-            for i, cand in enumerate(candidatas):
-                if cand["fonte"] == "LISTA_OFICIAL":
-                    canonica_idx = i
-                    break
+            canonica_idx = _indice_canonico_sem_prefixo_paraf(candidatas)
+            if canonica_idx is None:
+                for i, cand in enumerate(candidatas):
+                    if cand["fonte"] == "LISTA_OFICIAL":
+                        canonica_idx = i
+                        break
             if conflito["categoria"] in ("C", "D"):
                 pendencias_descricao.append({
                     "codigo_completo": codigo_final, "tipo": "CONFLITO_DESCRICAO", "nivel_confianca": None,
@@ -480,11 +506,14 @@ def construir_plano(conn_leitura: sqlite3.Connection, caminho_planilha: Path, co
                 # Descrições diferentes só se encontraram aqui por causa da
                 # fusão de 5 dígitos (nunca foram comparadas pela
                 # classificação de conflitos, que roda por codigo_original).
-                # Mesma prioridade: lista oficial primeiro.
-                for i, cand in enumerate(candidatas):
-                    if cand["fonte"] == "LISTA_OFICIAL":
-                        canonica_idx = i
-                        break
+                # Mesma prioridade: sem prefixo PARAF primeiro, senão lista
+                # oficial.
+                canonica_idx = _indice_canonico_sem_prefixo_paraf(candidatas)
+                if canonica_idx is None:
+                    for i, cand in enumerate(candidatas):
+                        if cand["fonte"] == "LISTA_OFICIAL":
+                            canonica_idx = i
+                            break
                 if canonica_idx is None:
                     canonica_idx = 0
 
@@ -744,6 +773,31 @@ def construir_plano(conn_leitura: sqlite3.Connection, caminho_planilha: Path, co
 
     grupo_arruela_pairs = {(grupo_de(item["cliente"]), item["arruela"]) for item in cliente_arruelas_plano}
 
+    # --- Consolida a canônica no nível do CPD-base (pai) --------------------
+    # CPDs não têm mais variações: "31947", "31947.1" e "31947.2" colapsam no
+    # MESMO CPD. A decisão de canônica acima ainda roda por codigo_completo
+    # (histórico, preservado por compatibilidade com o restante da função),
+    # então um código com extensões pode terminar com mais de uma linha
+    # marcada canônica -- uma por código histórico, não uma por CPD. Aqui,
+    # depois do colapso, reaplica a MESMA prioridade (sem prefixo PARAF,
+    # senão lista oficial) só entre as fontes que pertencem ao mesmo pai,
+    # garantindo exatamente uma canônica por CPD-base.
+    fontes_por_pai: dict[str, list[dict]] = defaultdict(list)
+    for d in descricoes_fontes:
+        info = codigos_finais.get(d["codigo_completo"])
+        pai = info["codigo_pai"] if info else d["codigo_completo"]
+        fontes_por_pai[pai].append(d)
+
+    for fontes_pai in fontes_por_pai.values():
+        if sum(1 for f in fontes_pai if f["descricao_canonica"]) <= 1:
+            continue
+        for f in fontes_pai:
+            f["descricao_canonica"] = 0
+        idx = _indice_canonico_sem_prefixo_paraf(fontes_pai)
+        if idx is None:
+            idx = next((i for i, f in enumerate(fontes_pai) if f["fonte"] == "LISTA_OFICIAL"), 0)
+        fontes_pai[idx]["descricao_canonica"] = 1
+
     return {
         "gerado_em": agora,
         "clientes": clientes_plano,
@@ -892,34 +946,35 @@ def aplicar_migracao(conn: sqlite3.Connection, plano: dict) -> dict:
             )
             total_aliases += 1
 
-    canonicas_por_codigo = {
-        d["codigo_completo"]: d["descricao"] for d in plano["descricoes_fontes"] if d["descricao_canonica"] == 1
-    }
+    # Chave por codigo_pai (não por codigo_completo): a canônica de um CPD
+    # pode ter ficado marcada num código histórico com extensão (ex.:
+    # "31947.1"), já que construir_plano() consolida a canônica por pai
+    # depois do colapso -- mas o valor pode estar em qualquer um dos códigos
+    # históricos daquele pai.
+    codigos_finais = plano["codigos_finais"]
+    canonicas_por_pai: dict[str, str] = {}
+    for d in plano["descricoes_fontes"]:
+        if d["descricao_canonica"] != 1:
+            continue
+        info = codigos_finais.get(d["codigo_completo"])
+        pai = info["codigo_pai"] if info else d["codigo_completo"]
+        canonicas_por_pai[pai] = d["descricao"]
 
     cpd_id_por_pai: dict[str, int] = {}
     for pai in sorted(plano["pais_agrupados"]):
-        desc_padrao = canonicas_por_codigo.get(pai)
+        desc_padrao = canonicas_por_pai.get(pai)
         conn.execute(
             "INSERT INTO cpds(codigo_pai, descricao_padrao, ativo, criado_em, atualizado_em) VALUES (?,?,1,?,?)",
             (pai, desc_padrao, agora, agora),
         )
         cpd_id_por_pai[pai] = conn.execute("SELECT id FROM cpds WHERE codigo_pai=?", (pai,)).fetchone()[0]
 
-    cpd_variacao_id_por_codigo: dict[str, int] = {}
-    for codigo_completo, info in sorted(plano["codigos_finais"].items()):
-        if info["extensao"] is None:
-            continue
-        cpd_id = cpd_id_por_pai[info["codigo_pai"]]
-        desc_especifica = canonicas_por_codigo.get(codigo_completo)
-        conn.execute(
-            "INSERT INTO cpd_variacoes(cpd_id, codigo_completo, extensao, descricao_especifica, ativo, criado_em, atualizado_em) "
-            "VALUES (?,?,?,?,1,?,?)",
-            (cpd_id, codigo_completo, info["extensao"], desc_especifica, agora, agora),
-        )
-        cpd_variacao_id_por_codigo[codigo_completo] = conn.execute(
-            "SELECT id FROM cpd_variacoes WHERE codigo_completo=?", (codigo_completo,)
-        ).fetchone()[0]
-
+    # Regra oficial atual: CPDs não têm mais variações -- o único código
+    # canônico de um CPD é o codigo_pai de 5 dígitos. "04772", "04772.1",
+    # "04772/1" e "04772.01" são só formas históricas do MESMO CPD ("04772"),
+    # nunca cadastros funcionais separados. cpd_variacoes segue existindo no
+    # schema (criada pela migração v1->v2, já aplicada no banco real) só como
+    # estrutura órfã -- nunca é populada nem lida a partir daqui.
     total_cliente_cpds = 0
     for item in plano["cliente_cpds"]:
         cliente_id = cliente_id_por_nome.get(item["cliente"])
@@ -945,24 +1000,25 @@ def aplicar_migracao(conn: sqlite3.Connection, plano: dict) -> dict:
     for d in plano["descricoes_fontes"]:
         info = plano["codigos_finais"][d["codigo_completo"]]
         cpd_id = cpd_id_por_pai[info["codigo_pai"]]
-        variacao_id = cpd_variacao_id_por_codigo.get(d["codigo_completo"]) if info["extensao"] is not None else None
+        # codigo_completo preserva o texto ORIGINAL da fonte (ex.: "04772.1")
+        # para rastreabilidade -- cpd_variacao_id fica sempre None (sem
+        # cadastro funcional de variação, ver comentário acima).
         conn.execute(
             "INSERT INTO cpd_descricoes_fontes"
             "(cpd_id, cpd_variacao_id, codigo_completo, descricao, fonte, referencia_origem, cliente_origem, data_origem, descricao_canonica, criado_em) "
             "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (cpd_id, variacao_id, d["codigo_completo"], d["descricao"], d["fonte"], d["referencia_origem"],
+            (cpd_id, None, d["codigo_completo"], d["descricao"], d["fonte"], d["referencia_origem"],
              d["cliente_origem"], d["data_origem"], d["descricao_canonica"], agora),
         )
 
     for p in plano["pendencias"]:
         info = plano["codigos_finais"].get(p["codigo_completo"])
         cpd_id = cpd_id_por_pai.get(info["codigo_pai"]) if info else None
-        variacao_id = cpd_variacao_id_por_codigo.get(p["codigo_completo"]) if info and info["extensao"] is not None else None
         conn.execute(
             "INSERT INTO cpd_pendencias_revisao"
             "(cpd_id, cpd_variacao_id, codigo_completo, tipo, nivel_confianca, detalhes_json, status, criado_em, resolvido_em) "
             "VALUES (?,?,?,?,?,?,?,?,?)",
-            (cpd_id, variacao_id, p["codigo_completo"], p["tipo"], p.get("nivel_confianca"), p["detalhes_json"],
+            (cpd_id, None, p["codigo_completo"], p["tipo"], p.get("nivel_confianca"), p["detalhes_json"],
              p["status"], agora, p.get("resolvido_em")),
         )
 
@@ -1033,7 +1089,6 @@ def aplicar_migracao(conn: sqlite3.Connection, plano: dict) -> dict:
         "total_clientes_inseridos": len(cliente_id_por_nome),
         "total_aliases_inseridos": total_aliases,
         "total_cpds_pai_inseridos": len(cpd_id_por_pai),
-        "total_variacoes_inseridas": len(cpd_variacao_id_por_codigo),
         "total_cliente_cpds_inseridos": total_cliente_cpds,
         "total_grupo_cpds_inseridos": total_grupo_cpds,
         "total_descricoes_fontes_inseridas": len(plano["descricoes_fontes"]),

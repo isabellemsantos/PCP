@@ -44,6 +44,7 @@ def _env_path(var: str, default: Path) -> Path:
 
 ROOT = Path(__file__).resolve().parent
 HTML_FILE = ROOT / "pcp_prototype.html"
+CADASTROS_HTML_FILE = ROOT / "cadastros_admin.html"
 DB_FILE = _env_path("PCP_DB_FILE", ROOT / "pcp.sqlite3")
 EXCEL_FILE = _env_path("PCP_EXCEL_FILE", ROOT / "dados_pcp.xlsx")
 EXCEL_PENDING_FILE = _env_path("PCP_EXCEL_PENDING_FILE", ROOT / "dados_pcp_pendente.xlsx")
@@ -257,12 +258,24 @@ def ensure_existing_order_numbers() -> None:
         c.commit()
 
 
+def remover_acentos_upper(texto) -> str | None:
+    """Maiúsculas + sem acentos, pra comparação insensível a acento/caixa --
+    o UPPER() nativo do SQLite só normaliza ASCII, então "í" não vira "Í"
+    sozinho (ver normalize_login(), que resolve o mesmo problema pro login)."""
+    if texto is None:
+        return None
+    texto = str(texto).upper()
+    texto = unicodedata.normalize("NFKD", texto)
+    return "".join(ch for ch in texto if not unicodedata.combining(ch))
+
+
 def conn() -> sqlite3.Connection:
     c = sqlite3.connect(DB_FILE)
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA foreign_keys=ON")
     c.execute("PRAGMA journal_mode=WAL")
     c.execute("PRAGMA synchronous=NORMAL")
+    c.create_function("NOACENTO", 1, remover_acentos_upper)
     return c
 
 
@@ -343,6 +356,44 @@ def deve_aplicar_migracoes_automaticamente() -> bool:
     sem revisão humana explícita naquele momento.
     """
     return os.environ.get("PCP_APLICAR_MIGRACOES") == "1"
+
+
+CADASTROS_NOVOS_SCHEMA_MINIMO = 5
+
+
+def deve_habilitar_cadastros_novos() -> bool:
+    """Só expõe a tela /cadastros e as APIs /api/admin/* se
+    PCP_HABILITAR_CADASTROS_NOVOS=1.
+
+    Por padrão (variável ausente ou com qualquer outro valor) a página nova
+    fica indisponível (404) e o sistema legado (tela atual, /api/state, etc.)
+    continua funcionando exatamente como antes -- a ausência da variável
+    nunca causa erro no startup nem em nenhuma rota existente.
+    """
+    return os.environ.get("PCP_HABILITAR_CADASTROS_NOVOS") == "1"
+
+
+def require_cadastros_novos_habilitados():
+    """404 (sem detalhes internos) se a feature flag estiver desligada --
+    rota e página novas se comportam como se nem existissem."""
+    if not deve_habilitar_cadastros_novos():
+        return Response("Não encontrado.", status=404, mimetype="text/plain")
+    return None
+
+
+def require_schema_cadastros_novos(c: sqlite3.Connection):
+    """503 controlado (nunca traceback nem detalhes do banco) enquanto o
+    schema real ainda não tiver as tabelas das versões 4/5 (clientes/CPDs/
+    arruelas normalizados). Com PCP_APLICAR_MIGRACOES continuando desligada
+    por padrão, o banco real permanece em schema_version=3 até alguém
+    decidir aplicar a migração deliberadamente."""
+    if db_manutencao.get_schema_version(c) < CADASTROS_NOVOS_SCHEMA_MINIMO:
+        return jsonify({
+            "ok": False,
+            "codigo": "CADASTROS_NOVOS_INDISPONIVEIS",
+            "mensagem": "Os novos cadastros ainda não foram habilitados neste banco.",
+        }), 503
+    return None
 
 
 def get_meta(c: sqlite3.Connection) -> dict:
@@ -2008,6 +2059,733 @@ def api_export_pendentes_xlsx():
     tmp = Path(tempfile.gettempdir()) / f"pedidos_pendentes_{uuid.uuid4().hex}.xlsx"
     export_pendentes_to_xlsx(state, tmp)
     return send_file(tmp, as_attachment=True, download_name="pedidos_pendentes.xlsx")
+
+
+# ---------------------------------------------------------------------------
+# APIs administrativas somente leitura -- Clientes/CPDs/Arruelas/Pendências
+# (tabelas normalizadas das versões 4/5, ver db_manutencao.py).
+#
+# Só ficam disponíveis com PCP_HABILITAR_CADASTROS_NOVOS=1 (feature flag) E
+# schema_version >= CADASTROS_NOVOS_SCHEMA_MINIMO (5). Nenhuma rota aqui
+# escreve no banco -- só SELECT. Não existe POST/PUT/PATCH/DELETE nesta etapa.
+# ---------------------------------------------------------------------------
+
+CADASTROS_NOVOS_POR_PAGINA_PADRAO = 25
+CADASTROS_NOVOS_POR_PAGINA_MAXIMO = 100
+
+
+def parse_paginacao(args) -> tuple[int, int]:
+    try:
+        pagina = int(args.get("pagina", 1))
+    except (TypeError, ValueError):
+        pagina = 1
+    if pagina < 1:
+        pagina = 1
+    try:
+        por_pagina = int(args.get("por_pagina", CADASTROS_NOVOS_POR_PAGINA_PADRAO))
+    except (TypeError, ValueError):
+        por_pagina = CADASTROS_NOVOS_POR_PAGINA_PADRAO
+    if por_pagina < 1:
+        por_pagina = CADASTROS_NOVOS_POR_PAGINA_PADRAO
+    if por_pagina > CADASTROS_NOVOS_POR_PAGINA_MAXIMO:
+        por_pagina = CADASTROS_NOVOS_POR_PAGINA_MAXIMO
+    return pagina, por_pagina
+
+
+def montar_paginacao(pagina: int, por_pagina: int, total_itens: int) -> dict:
+    total_paginas = (total_itens + por_pagina - 1) // por_pagina if total_itens else 0
+    return {
+        "pagina": pagina,
+        "por_pagina": por_pagina,
+        "total_itens": total_itens,
+        "total_paginas": total_paginas,
+    }
+
+
+def parse_bool_param(value) -> bool | None:
+    if value is None or value == "":
+        return None
+    return str(value).strip().lower() in ("1", "true", "sim", "ativo")
+
+
+def resposta_nao_encontrado(mensagem: str):
+    return jsonify({"ok": False, "codigo": "NAO_ENCONTRADO", "mensagem": mensagem}), 404
+
+
+def contagem_pedidos_por_nome_cliente(c: sqlite3.Connection) -> dict:
+    """Conta pedidos (exceto lixeira) por nome de cliente exatamente como
+    aparece no payload de `orders` -- é um vínculo textual do sistema legado,
+    não uma FK, então a contagem é best-effort e nunca lê/altera orders além
+    de um SELECT simples."""
+    contagem: dict[str, int] = {}
+    for row in c.execute("SELECT payload FROM orders"):
+        payload = json_loads(row["payload"], {})
+        if payload.get("deleted"):
+            continue
+        nome = str(payload.get("cliente") or "").strip().upper()
+        if nome:
+            contagem[nome] = contagem.get(nome, 0) + 1
+    return contagem
+
+
+def cliente_grupos_nomes(c: sqlite3.Connection, cliente_id: int) -> list[str]:
+    return [r["nome"] for r in c.execute(
+        "SELECT g.nome FROM cliente_grupos cg JOIN grupos_clientes g ON g.id=cg.grupo_id "
+        "WHERE cg.cliente_id=? ORDER BY g.nome",
+        (cliente_id,),
+    ).fetchall()]
+
+
+def cliente_aliases_ativos(c: sqlite3.Connection, cliente_id: int) -> list[str]:
+    return [r["alias"] for r in c.execute(
+        "SELECT alias FROM cliente_aliases WHERE cliente_id=? AND ativo=1 ORDER BY alias",
+        (cliente_id,),
+    ).fetchall()]
+
+
+def cpd_grupos_nomes(c: sqlite3.Connection, cpd_id: int) -> list[str]:
+    return [r["nome"] for r in c.execute(
+        "SELECT g.nome FROM grupo_cpds gc JOIN grupos_clientes g ON g.id=gc.grupo_id "
+        "WHERE gc.cpd_id=? ORDER BY g.nome",
+        (cpd_id,),
+    ).fetchall()]
+
+
+def cpd_clientes_nomes(c: sqlite3.Connection, cpd_id: int) -> list[str]:
+    return [r["nome"] for r in c.execute(
+        "SELECT cl.nome FROM cliente_cpds cc JOIN clientes cl ON cl.id=cc.cliente_id "
+        "WHERE cc.cpd_id=? ORDER BY cl.nome",
+        (cpd_id,),
+    ).fetchall()]
+
+
+def arruela_grupos_nomes(c: sqlite3.Connection, arruela_id: int) -> list[str]:
+    return [r["nome"] for r in c.execute(
+        "SELECT g.nome FROM grupo_arruelas ga JOIN grupos_clientes g ON g.id=ga.grupo_id "
+        "WHERE ga.arruela_id=? ORDER BY g.nome",
+        (arruela_id,),
+    ).fetchall()]
+
+
+def arruela_clientes_nomes(c: sqlite3.Connection, arruela_id: int) -> list[str]:
+    return [r["nome"] for r in c.execute(
+        "SELECT cl.nome FROM cliente_arruelas ca JOIN clientes cl ON cl.id=ca.cliente_id "
+        "WHERE ca.arruela_id=? ORDER BY cl.nome",
+        (arruela_id,),
+    ).fetchall()]
+
+
+def pendencia_para_json(row: sqlite3.Row) -> dict:
+    detalhes = json_loads(row["detalhes_json"], None) if row["detalhes_json"] else None
+    return {
+        "id": row["id"],
+        "tipo": row["tipo"],
+        "status": row["status"],
+        "nivel_confianca": row["nivel_confianca"],
+        "codigo_completo": row["codigo_completo"],
+        "cpd_id": row["cpd_id"],
+        "cpd_variacao_id": row["cpd_variacao_id"],
+        "detalhes": detalhes,
+        "criado_em": row["criado_em"],
+        "resolvido_em": row["resolvido_em"],
+    }
+
+
+@app.get("/api/admin/resumo")
+def api_admin_resumo():
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        total_clientes_ativos = c.execute("SELECT COUNT(*) FROM clientes WHERE ativo=1").fetchone()[0]
+        total_clientes_inativos = c.execute("SELECT COUNT(*) FROM clientes WHERE ativo=0").fetchone()[0]
+        # CPDs não têm mais variações: o único código canônico é o codigo_pai
+        # de 5 dígitos (cpd_variacoes segue existindo no schema, mas nunca é
+        # populada nem lida -- ver migrar_clientes_cpds.py).
+        total_cpds = c.execute("SELECT COUNT(*) FROM cpds").fetchone()[0]
+        total_arruelas = c.execute("SELECT COUNT(*) FROM arruelas").fetchone()[0]
+        total_itens = total_cpds + total_arruelas
+        total_pendencias_abertas = c.execute(
+            "SELECT COUNT(*) FROM cpd_pendencias_revisao WHERE status='PENDENTE'"
+        ).fetchone()[0]
+        pendencias_por_tipo = {
+            r["tipo"]: r["total"] for r in c.execute(
+                "SELECT tipo, COUNT(*) AS total FROM cpd_pendencias_revisao "
+                "WHERE status='PENDENTE' GROUP BY tipo ORDER BY tipo"
+            ).fetchall()
+        }
+
+        return jsonify({
+            "ok": True,
+            "total_clientes_ativos": total_clientes_ativos,
+            "total_clientes_inativos": total_clientes_inativos,
+            "total_itens": total_itens,
+            "total_cpds": total_cpds,
+            "total_arruelas": total_arruelas,
+            "total_pendencias_abertas": total_pendencias_abertas,
+            "pendencias_por_tipo": pendencias_por_tipo,
+        })
+
+
+@app.get("/api/admin/clientes")
+def api_admin_clientes():
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        busca = (request.args.get("busca") or "").strip()
+        grupo = (request.args.get("grupo") or "").strip()
+        ativo = parse_bool_param(request.args.get("ativo"))
+        pagina, por_pagina = parse_paginacao(request.args)
+
+        condicoes: list[str] = []
+        parametros: list = []
+        if busca:
+            termo = f"%{remover_acentos_upper(busca)}%"
+            condicoes.append(
+                "(NOACENTO(cl.nome) LIKE ? OR EXISTS ("
+                "SELECT 1 FROM cliente_aliases ca WHERE ca.cliente_id=cl.id AND NOACENTO(ca.alias) LIKE ?"
+                "))"
+            )
+            parametros.extend([termo, termo])
+        if ativo is not None:
+            condicoes.append("cl.ativo = ?")
+            parametros.append(1 if ativo else 0)
+        if grupo:
+            condicoes.append(
+                "EXISTS (SELECT 1 FROM cliente_grupos cg JOIN grupos_clientes g ON g.id=cg.grupo_id "
+                "WHERE cg.cliente_id=cl.id AND NOACENTO(g.nome)=?)"
+            )
+            parametros.append(remover_acentos_upper(grupo))
+
+        where_sql = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
+
+        total_itens = c.execute(f"SELECT COUNT(*) FROM clientes cl {where_sql}", parametros).fetchone()[0]
+        linhas = c.execute(
+            f"SELECT cl.id, cl.nome, cl.ativo FROM clientes cl {where_sql} "
+            "ORDER BY cl.nome LIMIT ? OFFSET ?",
+            parametros + [por_pagina, (pagina - 1) * por_pagina],
+        ).fetchall()
+
+        pedidos_por_nome = contagem_pedidos_por_nome_cliente(c)
+
+        itens = []
+        for row in linhas:
+            cliente_id = row["id"]
+            aliases = cliente_aliases_ativos(c, cliente_id)
+            grupos = cliente_grupos_nomes(c, cliente_id)
+            total_cpds = c.execute(
+                "SELECT COUNT(*) FROM cliente_cpds WHERE cliente_id=?", (cliente_id,)
+            ).fetchone()[0]
+            total_arruelas = c.execute(
+                "SELECT COUNT(*) FROM cliente_arruelas WHERE cliente_id=?", (cliente_id,)
+            ).fetchone()[0]
+            nomes_possiveis = {row["nome"].strip().upper()} | {a.strip().upper() for a in aliases}
+            total_pedidos = sum(pedidos_por_nome.get(n, 0) for n in nomes_possiveis)
+            itens.append({
+                "id": cliente_id,
+                "nome": row["nome"],
+                "grupos": grupos,
+                "aliases": aliases,
+                "ativo": bool(row["ativo"]),
+                "total_cpds": total_cpds,
+                "total_arruelas": total_arruelas,
+                "total_pedidos": total_pedidos,
+            })
+
+        return jsonify({"itens": itens, "paginacao": montar_paginacao(pagina, por_pagina, total_itens)})
+
+
+@app.get("/api/admin/clientes/<int:cliente_id>")
+def api_admin_cliente_detalhe(cliente_id: int):
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        row = c.execute(
+            "SELECT id, nome, codigo_interno, observacoes, ativo, criado_em, atualizado_em, desativado_em "
+            "FROM clientes WHERE id=?",
+            (cliente_id,),
+        ).fetchone()
+        if row is None:
+            return resposta_nao_encontrado("Cliente não encontrado.")
+
+        aliases = cliente_aliases_ativos(c, cliente_id)
+        grupos = cliente_grupos_nomes(c, cliente_id)
+        cpds = [dict(r) for r in c.execute(
+            "SELECT cp.id, cp.codigo_pai AS codigo, cp.descricao_padrao, cp.ativo "
+            "FROM cliente_cpds cc JOIN cpds cp ON cp.id=cc.cpd_id "
+            "WHERE cc.cliente_id=? ORDER BY cp.codigo_pai",
+            (cliente_id,),
+        ).fetchall()]
+        arruelas = [dict(r) for r in c.execute(
+            "SELECT ar.id, ar.codigo, ar.descricao_padrao, ar.ativo "
+            "FROM cliente_arruelas ca JOIN arruelas ar ON ar.id=ca.arruela_id "
+            "WHERE ca.cliente_id=? ORDER BY ar.codigo",
+            (cliente_id,),
+        ).fetchall()]
+        nomes_possiveis = {row["nome"].strip().upper()} | {a.strip().upper() for a in aliases}
+        pedidos_por_nome = contagem_pedidos_por_nome_cliente(c)
+        total_pedidos = sum(pedidos_por_nome.get(n, 0) for n in nomes_possiveis)
+
+        return jsonify({
+            "id": row["id"],
+            "nome": row["nome"],
+            "codigo_interno": row["codigo_interno"],
+            "observacoes": row["observacoes"],
+            "ativo": bool(row["ativo"]),
+            "criado_em": row["criado_em"],
+            "atualizado_em": row["atualizado_em"],
+            "desativado_em": row["desativado_em"],
+            "grupos": grupos,
+            "aliases": aliases,
+            "cpds": cpds,
+            "arruelas": arruelas,
+            "total_pedidos": total_pedidos,
+        })
+
+
+@app.get("/api/admin/cpds")
+def api_admin_cpds():
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        busca = (request.args.get("busca") or "").strip()
+        cliente = (request.args.get("cliente") or "").strip()
+        grupo = (request.args.get("grupo") or "").strip()
+        ativo = parse_bool_param(request.args.get("ativo"))
+        pagina, por_pagina = parse_paginacao(request.args)
+
+        condicoes: list[str] = []
+        parametros: list = []
+        if busca:
+            termo = f"%{remover_acentos_upper(busca)}%"
+            condicoes.append(
+                "(NOACENTO(cp.codigo_pai) LIKE ? OR NOACENTO(COALESCE(cp.descricao_padrao,'')) LIKE ?)"
+            )
+            parametros.extend([termo, termo])
+        if ativo is not None:
+            condicoes.append("cp.ativo = ?")
+            parametros.append(1 if ativo else 0)
+        if cliente:
+            condicoes.append(
+                "EXISTS (SELECT 1 FROM cliente_cpds cc JOIN clientes cl ON cl.id=cc.cliente_id "
+                "WHERE cc.cpd_id=cp.id AND NOACENTO(cl.nome)=?)"
+            )
+            parametros.append(remover_acentos_upper(cliente))
+        if grupo:
+            condicoes.append(
+                "EXISTS (SELECT 1 FROM grupo_cpds gc JOIN grupos_clientes g ON g.id=gc.grupo_id "
+                "WHERE gc.cpd_id=cp.id AND NOACENTO(g.nome)=?)"
+            )
+            parametros.append(remover_acentos_upper(grupo))
+
+        where_sql = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
+
+        total_itens = c.execute(f"SELECT COUNT(*) FROM cpds cp {where_sql}", parametros).fetchone()[0]
+        linhas = c.execute(
+            f"SELECT cp.id, cp.codigo_pai, cp.descricao_padrao, cp.ativo FROM cpds cp {where_sql} "
+            "ORDER BY cp.codigo_pai LIMIT ? OFFSET ?",
+            parametros + [por_pagina, (pagina - 1) * por_pagina],
+        ).fetchall()
+
+        itens = []
+        for row in linhas:
+            cpd_id = row["id"]
+            total_pendencias = c.execute(
+                "SELECT COUNT(*) FROM cpd_pendencias_revisao WHERE cpd_id=? AND status='PENDENTE'",
+                (cpd_id,),
+            ).fetchone()[0]
+            itens.append({
+                "id": cpd_id,
+                "codigo": row["codigo_pai"],
+                "descricao_padrao": row["descricao_padrao"],
+                "ativo": bool(row["ativo"]),
+                "clientes": cpd_clientes_nomes(c, cpd_id),
+                "grupos": cpd_grupos_nomes(c, cpd_id),
+                "total_pendencias": total_pendencias,
+            })
+
+        return jsonify({"itens": itens, "paginacao": montar_paginacao(pagina, por_pagina, total_itens)})
+
+
+@app.get("/api/admin/cpds/<int:cpd_id>")
+def api_admin_cpd_detalhe(cpd_id: int):
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        row = c.execute(
+            "SELECT id, codigo_pai, descricao_padrao, observacoes, ativo, criado_em, atualizado_em, desativado_em "
+            "FROM cpds WHERE id=?",
+            (cpd_id,),
+        ).fetchone()
+        if row is None:
+            return resposta_nao_encontrado("CPD não encontrado.")
+
+        # codigo_completo aqui é o texto ORIGINAL histórico da fonte (ex.:
+        # "04772.1", "04772/1") preservado para rastreabilidade -- não é um
+        # cadastro de variação, só metadado de onde veio cada descrição. CPDs
+        # não têm mais variações: o único código canônico é o codigo_pai.
+        descricoes_fontes = [dict(r) for r in c.execute(
+            "SELECT id, codigo_completo, descricao, fonte, referencia_origem, cliente_origem, "
+            "descricao_canonica, criado_em FROM cpd_descricoes_fontes WHERE cpd_id=? "
+            "ORDER BY codigo_completo, descricao_canonica DESC",
+            (cpd_id,),
+        ).fetchall()]
+        descricao_canonica = next((d["descricao"] for d in descricoes_fontes if d["descricao_canonica"]), row["descricao_padrao"])
+        codigos_originais_historicos = sorted({d["codigo_completo"] for d in descricoes_fontes})
+
+        pendencias_rows = c.execute(
+            "SELECT * FROM cpd_pendencias_revisao WHERE cpd_id=? ORDER BY criado_em DESC",
+            (cpd_id,),
+        ).fetchall()
+        pendencias = [pendencia_para_json(r) for r in pendencias_rows]
+
+        return jsonify({
+            "id": row["id"],
+            "codigo": row["codigo_pai"],
+            "descricao_padrao": row["descricao_padrao"],
+            "descricao_canonica": descricao_canonica,
+            "observacoes": row["observacoes"],
+            "ativo": bool(row["ativo"]),
+            "criado_em": row["criado_em"],
+            "atualizado_em": row["atualizado_em"],
+            "desativado_em": row["desativado_em"],
+            "codigos_originais_historicos": codigos_originais_historicos,
+            "descricoes_fontes": descricoes_fontes,
+            "clientes": cpd_clientes_nomes(c, cpd_id),
+            "grupos": cpd_grupos_nomes(c, cpd_id),
+            "pendencias": pendencias,
+        })
+
+
+@app.get("/api/admin/itens")
+def api_admin_itens():
+    """Consulta unificada de CPDs + arruelas (categorias distintas, nunca
+    misturadas no banco -- só reunidas aqui numa listagem só de leitura)."""
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        busca = (request.args.get("busca") or "").strip()
+        tipo = (request.args.get("tipo") or "").strip().upper()
+        cliente = (request.args.get("cliente") or "").strip()
+        grupo = (request.args.get("grupo") or "").strip()
+        ativo = parse_bool_param(request.args.get("ativo"))
+        possui_pendencia = parse_bool_param(request.args.get("possui_pendencia"))
+        pagina, por_pagina = parse_paginacao(request.args)
+
+        itens: list[dict] = []
+
+        if tipo in ("", "CPD"):
+            pendencias_por_cpd = {
+                r["cpd_id"]: r["total"] for r in c.execute(
+                    "SELECT cpd_id, COUNT(*) AS total FROM cpd_pendencias_revisao "
+                    "WHERE status='PENDENTE' AND cpd_id IS NOT NULL GROUP BY cpd_id"
+                ).fetchall()
+            }
+            condicoes: list[str] = []
+            parametros: list = []
+            if busca:
+                termo = f"%{remover_acentos_upper(busca)}%"
+                condicoes.append("(NOACENTO(cp.codigo_pai) LIKE ? OR NOACENTO(COALESCE(cp.descricao_padrao,'')) LIKE ?)")
+                parametros.extend([termo, termo])
+            if ativo is not None:
+                condicoes.append("cp.ativo = ?")
+                parametros.append(1 if ativo else 0)
+            if cliente:
+                condicoes.append(
+                    "EXISTS (SELECT 1 FROM cliente_cpds cc JOIN clientes cl ON cl.id=cc.cliente_id "
+                    "WHERE cc.cpd_id=cp.id AND NOACENTO(cl.nome)=?)"
+                )
+                parametros.append(remover_acentos_upper(cliente))
+            if grupo:
+                condicoes.append(
+                    "EXISTS (SELECT 1 FROM grupo_cpds gc JOIN grupos_clientes g ON g.id=gc.grupo_id "
+                    "WHERE gc.cpd_id=cp.id AND NOACENTO(g.nome)=?)"
+                )
+                parametros.append(remover_acentos_upper(grupo))
+            where_sql = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
+            for row in c.execute(
+                f"SELECT id, codigo_pai, descricao_padrao, ativo FROM cpds cp {where_sql}", parametros
+            ).fetchall():
+                cpd_id = row["id"]
+                total_pendencias = pendencias_por_cpd.get(cpd_id, 0)
+                if possui_pendencia is not None and (total_pendencias > 0) != possui_pendencia:
+                    continue
+                itens.append({
+                    "id": cpd_id,
+                    "tipo": "CPD",
+                    "codigo": row["codigo_pai"],
+                    "descricao": row["descricao_padrao"],
+                    "ativo": bool(row["ativo"]),
+                    "clientes": cpd_clientes_nomes(c, cpd_id),
+                    "grupos": cpd_grupos_nomes(c, cpd_id),
+                    "total_pendencias": total_pendencias,
+                })
+
+        # Arruelas não têm pendências próprias neste schema -- se o filtro
+        # exige "com pendência", nenhuma arruela pode satisfazer.
+        if tipo in ("", "ARRUELA") and possui_pendencia is not True:
+            condicoes = []
+            parametros = []
+            if busca:
+                termo = f"%{remover_acentos_upper(busca)}%"
+                condicoes.append("(NOACENTO(ar.codigo) LIKE ? OR NOACENTO(COALESCE(ar.descricao_padrao,'')) LIKE ?)")
+                parametros.extend([termo, termo])
+            if ativo is not None:
+                condicoes.append("ar.ativo = ?")
+                parametros.append(1 if ativo else 0)
+            if cliente:
+                condicoes.append(
+                    "EXISTS (SELECT 1 FROM cliente_arruelas ca JOIN clientes cl ON cl.id=ca.cliente_id "
+                    "WHERE ca.arruela_id=ar.id AND NOACENTO(cl.nome)=?)"
+                )
+                parametros.append(remover_acentos_upper(cliente))
+            if grupo:
+                condicoes.append(
+                    "EXISTS (SELECT 1 FROM grupo_arruelas ga JOIN grupos_clientes g ON g.id=ga.grupo_id "
+                    "WHERE ga.arruela_id=ar.id AND NOACENTO(g.nome)=?)"
+                )
+                parametros.append(remover_acentos_upper(grupo))
+            where_sql = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
+            for row in c.execute(
+                f"SELECT id, codigo, descricao_padrao, ativo FROM arruelas ar {where_sql}", parametros
+            ).fetchall():
+                itens.append({
+                    "id": row["id"],
+                    "tipo": "ARRUELA",
+                    "codigo": row["codigo"],
+                    "descricao": row["descricao_padrao"],
+                    "ativo": bool(row["ativo"]),
+                    "clientes": arruela_clientes_nomes(c, row["id"]),
+                    "grupos": arruela_grupos_nomes(c, row["id"]),
+                    "total_pendencias": 0,
+                })
+
+        itens.sort(key=lambda i: (i["codigo"] or ""))
+        total = len(itens)
+        inicio = (pagina - 1) * por_pagina
+        pagina_itens = itens[inicio:inicio + por_pagina]
+
+        return jsonify({"itens": pagina_itens, "paginacao": montar_paginacao(pagina, por_pagina, total)})
+
+
+@app.get("/api/admin/arruelas")
+def api_admin_arruelas():
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        busca = (request.args.get("busca") or "").strip()
+        cliente = (request.args.get("cliente") or "").strip()
+        grupo = (request.args.get("grupo") or "").strip()
+        ativo = parse_bool_param(request.args.get("ativo"))
+        pagina, por_pagina = parse_paginacao(request.args)
+
+        condicoes: list[str] = []
+        parametros: list = []
+        if busca:
+            termo = f"%{remover_acentos_upper(busca)}%"
+            condicoes.append("(NOACENTO(ar.codigo) LIKE ? OR NOACENTO(COALESCE(ar.descricao_padrao,'')) LIKE ?)")
+            parametros.extend([termo, termo])
+        if ativo is not None:
+            condicoes.append("ar.ativo = ?")
+            parametros.append(1 if ativo else 0)
+        if cliente:
+            condicoes.append(
+                "EXISTS (SELECT 1 FROM cliente_arruelas ca JOIN clientes cl ON cl.id=ca.cliente_id "
+                "WHERE ca.arruela_id=ar.id AND NOACENTO(cl.nome)=?)"
+            )
+            parametros.append(remover_acentos_upper(cliente))
+        if grupo:
+            condicoes.append(
+                "EXISTS (SELECT 1 FROM grupo_arruelas ga JOIN grupos_clientes g ON g.id=ga.grupo_id "
+                "WHERE ga.arruela_id=ar.id AND NOACENTO(g.nome)=?)"
+            )
+            parametros.append(remover_acentos_upper(grupo))
+
+        where_sql = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
+
+        total_itens = c.execute(f"SELECT COUNT(*) FROM arruelas ar {where_sql}", parametros).fetchone()[0]
+        linhas = c.execute(
+            f"SELECT ar.id, ar.codigo, ar.descricao_padrao, ar.ativo FROM arruelas ar {where_sql} "
+            "ORDER BY ar.codigo LIMIT ? OFFSET ?",
+            parametros + [por_pagina, (pagina - 1) * por_pagina],
+        ).fetchall()
+
+        itens = [{
+            "id": row["id"],
+            "codigo": row["codigo"],
+            "descricao_padrao": row["descricao_padrao"],
+            "ativo": bool(row["ativo"]),
+            "clientes": arruela_clientes_nomes(c, row["id"]),
+            "grupos": arruela_grupos_nomes(c, row["id"]),
+        } for row in linhas]
+
+        return jsonify({"itens": itens, "paginacao": montar_paginacao(pagina, por_pagina, total_itens)})
+
+
+@app.get("/api/admin/arruelas/<int:arruela_id>")
+def api_admin_arruela_detalhe(arruela_id: int):
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        row = c.execute(
+            "SELECT id, codigo, descricao_padrao, ativo, criado_em, atualizado_em, desativado_em "
+            "FROM arruelas WHERE id=?",
+            (arruela_id,),
+        ).fetchone()
+        if row is None:
+            return resposta_nao_encontrado("Arruela não encontrada.")
+
+        descricoes_fontes = [dict(r) for r in c.execute(
+            "SELECT id, codigo_original, descricao, fonte, referencia_origem, cliente_origem, "
+            "descricao_canonica, criado_em FROM arruela_descricoes_fontes WHERE arruela_id=? "
+            "ORDER BY descricao_canonica DESC, criado_em",
+            (arruela_id,),
+        ).fetchall()]
+
+        return jsonify({
+            "id": row["id"],
+            "codigo": row["codigo"],
+            "descricao_padrao": row["descricao_padrao"],
+            "ativo": bool(row["ativo"]),
+            "criado_em": row["criado_em"],
+            "atualizado_em": row["atualizado_em"],
+            "desativado_em": row["desativado_em"],
+            "descricoes_fontes": descricoes_fontes,
+            "clientes": arruela_clientes_nomes(c, arruela_id),
+            "grupos": arruela_grupos_nomes(c, arruela_id),
+        })
+
+
+@app.get("/api/admin/pendencias")
+def api_admin_pendencias():
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        tipo = (request.args.get("tipo") or "").strip()
+        status = (request.args.get("status") or "").strip()
+        nivel_confianca = (request.args.get("nivel_confianca") or "").strip()
+        codigo = (request.args.get("codigo") or "").strip()
+        pagina, por_pagina = parse_paginacao(request.args)
+
+        condicoes: list[str] = []
+        parametros: list = []
+        if tipo:
+            condicoes.append("tipo = ?")
+            parametros.append(tipo)
+        if status:
+            condicoes.append("status = ?")
+            parametros.append(status)
+        if nivel_confianca:
+            condicoes.append("nivel_confianca = ?")
+            parametros.append(nivel_confianca)
+        if codigo:
+            condicoes.append("NOACENTO(codigo_completo) LIKE ?")
+            parametros.append(f"%{remover_acentos_upper(codigo)}%")
+
+        where_sql = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
+
+        total_itens = c.execute(
+            f"SELECT COUNT(*) FROM cpd_pendencias_revisao {where_sql}", parametros
+        ).fetchone()[0]
+        linhas = c.execute(
+            f"SELECT * FROM cpd_pendencias_revisao {where_sql} "
+            "ORDER BY criado_em DESC LIMIT ? OFFSET ?",
+            parametros + [por_pagina, (pagina - 1) * por_pagina],
+        ).fetchall()
+
+        itens = [pendencia_para_json(row) for row in linhas]
+        return jsonify({"itens": itens, "paginacao": montar_paginacao(pagina, por_pagina, total_itens)})
+
+
+@app.get("/api/admin/pendencias/<int:pendencia_id>")
+def api_admin_pendencia_detalhe(pendencia_id: int):
+    with lock, conn() as c:
+        bloqueado = require_cadastros_novos_habilitados()
+        if bloqueado is not None:
+            return bloqueado
+        bloqueado = require_schema_cadastros_novos(c)
+        if bloqueado is not None:
+            return bloqueado
+
+        row = c.execute(
+            "SELECT * FROM cpd_pendencias_revisao WHERE id=?", (pendencia_id,)
+        ).fetchone()
+        if row is None:
+            return resposta_nao_encontrado("Pendência não encontrada.")
+
+        dados = pendencia_para_json(row)
+        if row["cpd_id"] is not None:
+            cpd_row = c.execute("SELECT codigo_pai FROM cpds WHERE id=?", (row["cpd_id"],)).fetchone()
+            dados["cpd_codigo_pai"] = cpd_row["codigo_pai"] if cpd_row else None
+        else:
+            dados["cpd_codigo_pai"] = None
+        if row["cpd_variacao_id"] is not None:
+            var_row = c.execute(
+                "SELECT codigo_completo FROM cpd_variacoes WHERE id=?", (row["cpd_variacao_id"],)
+            ).fetchone()
+            dados["variacao_codigo_completo"] = var_row["codigo_completo"] if var_row else None
+        else:
+            dados["variacao_codigo_completo"] = None
+
+        return jsonify(dados)
+
+
+@app.get("/cadastros")
+def pagina_cadastros():
+    bloqueado = require_cadastros_novos_habilitados()
+    if bloqueado is not None:
+        return bloqueado
+    if not CADASTROS_HTML_FILE.exists():
+        return Response("Arquivo cadastros_admin.html não encontrado.", status=404, mimetype="text/plain")
+    html = CADASTROS_HTML_FILE.read_text(encoding="utf-8")
+    aviso_demo = os.environ.get("PCP_DEMO_BANNER", "").strip()
+    if aviso_demo:
+        html = html.replace("<!--DEMO_BANNER-->", f'<div class="demo-banner">{aviso_demo}</div>')
+    return Response(html, mimetype="text/html; charset=utf-8")
 
 
 @app.get("/")
